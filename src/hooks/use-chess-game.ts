@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Chess, Move, Square, PieceSymbol, Color } from "chess.js";
-import { findBestMove } from "@/lib/chess-engine";
 import { getDifficultyById, DifficultyLevel, defaultDifficulty } from "@/lib/board-themes";
 
 export interface CapturedPieces {
@@ -27,7 +26,7 @@ export interface GameState {
 export interface UseChessGameOptions {
     playerColor?: "w" | "b";
     difficulty?: string;
-    onGameEnd?: (winner: "white" | "black" | "draw" | null) => void;
+    onGameEnd?: (winner: "white" | "black" | "draw" | null, finalState?: GameState, timeState?: { whiteTime: number; blackTime: number }) => void;
 }
 
 export function useChessGame(options: UseChessGameOptions = {}) {
@@ -44,6 +43,13 @@ export function useChessGame(options: UseChessGameOptions = {}) {
     const [whiteTime, setWhiteTime] = useState(600); // 10 minutes default
     const [blackTime, setBlackTime] = useState(600);
     const [isThinking, setIsThinking] = useState(false);
+
+    // Simplest fix: Add time refs to track time for callbacks.
+    const whiteTimeRef = useRef(600);
+    const blackTimeRef = useRef(600);
+
+    useEffect(() => { whiteTimeRef.current = whiteTime; }, [whiteTime]);
+    useEffect(() => { blackTimeRef.current = blackTime; }, [blackTime]);
 
     const getGameState = useCallback((game: Chess): GameState => {
         const history = game.history({ verbose: true });
@@ -82,7 +88,7 @@ export function useChessGame(options: UseChessGameOptions = {}) {
         setGameState(newState);
 
         if (newState.isGameOver && onGameEnd) {
-            onGameEnd(newState.winner);
+            onGameEnd(newState.winner, newState, { whiteTime: whiteTimeRef.current, blackTime: blackTimeRef.current });
         }
     }, [onGameEnd, getGameState]);
 
@@ -99,6 +105,38 @@ export function useChessGame(options: UseChessGameOptions = {}) {
         return false;
     }, [updateState]);
 
+    // AI Worker Ref
+    const workerRef = useRef<Worker | null>(null);
+    // Queue for pending hint resolvers to handle async worker responses
+    const hintResolverRef = useRef<((move: { from: Square; to: Square } | null) => void) | null>(null);
+
+    useEffect(() => {
+        // Initialize worker
+        workerRef.current = new Worker(new URL("../workers/stockfish.worker.ts", import.meta.url));
+
+        workerRef.current.onmessage = (e) => {
+            const { bestMove, type } = e.data;
+
+            if (type === 'hint') {
+                if (hintResolverRef.current) {
+                    hintResolverRef.current(bestMove ? { from: bestMove.from, to: bestMove.to } : null);
+                    hintResolverRef.current = null;
+                }
+            } else {
+                // Default 'move' behavior for AI opponent
+                if (bestMove) {
+                    gameRef.current.move(bestMove);
+                    updateState();
+                }
+                setIsThinking(false);
+            }
+        };
+
+        return () => {
+            workerRef.current?.terminate();
+        };
+    }, [updateState]);
+
     const makeAIMove = useCallback(async () => {
         if (gameRef.current.isGameOver() || gameRef.current.turn() === playerColor) {
             return;
@@ -106,18 +144,36 @@ export function useChessGame(options: UseChessGameOptions = {}) {
 
         setIsThinking(true);
 
-        // Use setTimeout to allow UI to update before heavy computation
-        setTimeout(() => {
-            const bestMove = findBestMove(gameRef.current, difficultyLevel.depth);
+        const fen = gameRef.current.fen();
+        const depth = difficultyLevel.depth;
 
-            if (bestMove) {
-                gameRef.current.move(bestMove);
-                updateState();
+        if (workerRef.current) {
+            workerRef.current.postMessage({ fen, depth, type: 'move' });
+        } else {
+            console.error("Worker not initialized");
+            setIsThinking(false);
+        }
+
+    }, [playerColor, difficultyLevel.depth]);
+
+    const getBestMove = useCallback(async (): Promise<{ from: Square, to: Square } | null> => {
+        return new Promise((resolve) => {
+            if (!workerRef.current) {
+                resolve(null);
+                return;
             }
 
-            setIsThinking(false);
-        }, 300);
-    }, [playerColor, difficultyLevel.depth, updateState]);
+            // Cancel any pending hint
+            if (hintResolverRef.current) {
+                hintResolverRef.current(null);
+            }
+
+            hintResolverRef.current = resolve;
+            // Use a fixed depth for hints or current difficulty
+            const depth = Math.max(4, difficultyLevel.depth);
+            workerRef.current.postMessage({ fen: gameRef.current.fen(), depth, type: 'hint' });
+        });
+    }, [difficultyLevel.depth]);
 
     // Timer logic
     useEffect(() => {
@@ -128,8 +184,10 @@ export function useChessGame(options: UseChessGameOptions = {}) {
                 setWhiteTime((t) => {
                     const next = Math.max(0, t - 1);
                     if (next === 0) {
-                        onGameEnd?.("black");
-                        setGameState(s => ({ ...s, isGameOver: true, winner: "black" }));
+                        const winner = "black";
+                        const finalState = { ...gameState, isGameOver: true, winner };
+                        onGameEnd?.(winner, finalState as GameState, { whiteTime: 0, blackTime: blackTimeRef.current });
+                        setGameState(finalState as GameState);
                     }
                     return next;
                 });
@@ -137,8 +195,10 @@ export function useChessGame(options: UseChessGameOptions = {}) {
                 setBlackTime((t) => {
                     const next = Math.max(0, t - 1);
                     if (next === 0) {
-                        onGameEnd?.("white");
-                        setGameState(s => ({ ...s, isGameOver: true, winner: "white" }));
+                        const winner = "white";
+                        const finalState = { ...gameState, isGameOver: true, winner };
+                        onGameEnd?.(winner, finalState as GameState, { whiteTime: whiteTimeRef.current, blackTime: 0 });
+                        setGameState(finalState as GameState);
                     }
                     return next;
                 });
@@ -146,7 +206,7 @@ export function useChessGame(options: UseChessGameOptions = {}) {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [gameState.turn, gameState.isGameOver, isThinking, onGameEnd]);
+    }, [gameState.turn, gameState.isGameOver, isThinking, onGameEnd, gameState]); // Added gameState dependency for timer end state construction
 
     // Trigger AI move when it's AI's turn
     useEffect(() => {
@@ -205,6 +265,8 @@ export function useChessGame(options: UseChessGameOptions = {}) {
         undoMove,
         getLegalMoves,
         changeDifficulty,
+        getBestMove,
+        gameRef, // Exposing gameRef if needed for validation, but getBestMove handles it
     };
 }
 

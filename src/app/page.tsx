@@ -34,7 +34,7 @@ export default function Home() {
               </p>
 
               <Link
-                href="#"
+                href="/login"
                 className="inline-flex rounded-md bg-white px-10 py-4 text-sm font-bold text-black shadow-2xl transition hover:bg-white/90 hover:scale-105"
               >
                 Get started!

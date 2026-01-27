@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Chessboard } from "react-chessboard";
 import { Square } from "chess.js";
 import { BoardTheme } from "@/lib/board-themes";
@@ -12,7 +12,8 @@ interface ChessBoardWrapperProps {
     lastMove: { from: Square; to: Square } | null;
     onPieceDrop: (sourceSquare: Square, targetSquare: Square) => boolean;
     getLegalMoves: (square: Square) => Square[];
-    isThinking: boolean;
+    hintMove?: { from: Square; to: Square } | null;
+    isThinking?: boolean;
 }
 
 export function ChessBoardWrapper({
@@ -22,30 +23,38 @@ export function ChessBoardWrapper({
     lastMove,
     onPieceDrop,
     getLegalMoves,
-    isThinking,
+    hintMove,
+    isThinking = false,
 }: ChessBoardWrapperProps) {
     const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
     const [legalMoves, setLegalMoves] = useState<Square[]>([]);
 
+    // Check if a square is light colored
+    const isLight = useCallback((square: Square): boolean => {
+        const file = square.charCodeAt(0) - 97;
+        const rank = parseInt(square[1]) - 1;
+        return (file + rank) % 2 === 1;
+    }, []);
+
     // Build custom square styles
-    const buildSquareStyles = (): Record<string, React.CSSProperties> => {
+    const buildSquareStyles = useCallback((): Record<string, React.CSSProperties> => {
         const styles: Record<string, React.CSSProperties> = {};
 
         // Highlight last move
         if (lastMove) {
-            styles[lastMove.from] = {
-                backgroundColor: theme.lastMoveLight,
-            };
-            styles[lastMove.to] = {
-                backgroundColor: theme.lastMoveDark,
-            };
+            styles[lastMove.from] = { backgroundColor: theme.lastMoveLight };
+            styles[lastMove.to] = { backgroundColor: theme.lastMoveDark };
+        }
+
+        // Highlight hint move source
+        if (hintMove) {
+            styles[hintMove.from] = { backgroundColor: 'rgba(255, 255, 0, 0.5)' };
+            styles[hintMove.to] = { backgroundColor: 'rgba(255, 255, 0, 0.5)' };
         }
 
         // Highlight selected square
         if (selectedSquare) {
-            styles[selectedSquare] = {
-                backgroundColor: theme.highlightLight,
-            };
+            styles[selectedSquare] = { backgroundColor: theme.highlightLight };
         }
 
         // Show legal move indicators (dots)
@@ -60,17 +69,16 @@ export function ChessBoardWrapper({
         });
 
         return styles;
-    };
+    }, [lastMove, hintMove, selectedSquare, legalMoves, theme, isLight]);
 
-    // Check if a square is light colored
-    const isLight = (square: Square): boolean => {
-        const file = square.charCodeAt(0) - 97;
-        const rank = parseInt(square[1]) - 1;
-        return (file + rank) % 2 === 1;
-    };
+    // Build arrows for hint visualization (correct Arrow type)
+    const arrows: { startSquare: string; endSquare: string; color: string }[] = [];
+    if (hintMove) {
+        arrows.push({ startSquare: hintMove.from, endSquare: hintMove.to, color: "rgba(255, 200, 0, 0.8)" });
+    }
 
     // Handle square click
-    const handleSquareClick = (square: string) => {
+    const handleSquareClick = useCallback(({ square }: { piece: { pieceType: string } | null; square: string }) => {
         if (isThinking) return;
 
         const sq = square as Square;
@@ -102,56 +110,31 @@ export function ChessBoardWrapper({
             setSelectedSquare(null);
             setLegalMoves([]);
         }
-    };
+    }, [isThinking, selectedSquare, legalMoves, onPieceDrop, getLegalMoves]);
 
-    // Handle piece click (same as square click for our purposes)
-    const handlePieceClick = (piece: string, square: string) => {
-        handleSquareClick(square);
-    };
+    // Handle piece click (matches PieceHandlerArgs type)
+    const handlePieceClick = useCallback(({ square }: { isSparePiece: boolean; piece: { pieceType: string }; square: string | null }) => {
+        if (square) {
+            handleSquareClick({ piece: null, square });
+        }
+    }, [handleSquareClick]);
 
     return (
         <div className="relative w-full aspect-square max-w-[min(100vw-2rem,560px)] mx-auto">
-            {/* Thinking overlay */}
-            {isThinking && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 rounded-xl backdrop-blur-sm">
-                    <div className="flex items-center gap-3 bg-white/95 px-6 py-3 rounded-full shadow-xl">
-                        <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                        <span className="text-sm font-semibold text-[var(--foreground)]">Thinking...</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Board container with shadow and border */}
             <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-1 ring-black/10">
                 <Chessboard
                     options={{
                         position: fen,
                         boardOrientation: playerColor === "w" ? "white" : "black",
-                        boardStyle: {
-                            borderRadius: "0",
-                        },
-                        darkSquareStyle: {
-                            backgroundColor: theme.darkSquare,
-                        },
-                        lightSquareStyle: {
-                            backgroundColor: theme.lightSquare,
-                        },
                         squareStyles: buildSquareStyles(),
-                        onSquareClick: ({ square }) => handleSquareClick(square),
-                        onPieceClick: ({ piece, square }) => handlePieceClick(piece.pieceType, square || ""),
+                        arrows: arrows,
+                        onSquareClick: handleSquareClick,
+                        onPieceClick: handlePieceClick,
                         allowDragging: false,
-                        showNotation: true,
+                        darkSquareStyle: { backgroundColor: theme.darkSquare },
+                        lightSquareStyle: { backgroundColor: theme.lightSquare },
                         animationDurationInMs: 200,
-                        darkSquareNotationStyle: {
-                            fontSize: "11px",
-                            fontWeight: "600",
-                            color: theme.id === "modern" ? "#888" : "#fff",
-                        },
-                        lightSquareNotationStyle: {
-                            fontSize: "11px",
-                            fontWeight: "600",
-                            color: theme.id === "modern" ? "#888" : "#666",
-                        },
+                        showNotation: true,
                     }}
                 />
             </div>
