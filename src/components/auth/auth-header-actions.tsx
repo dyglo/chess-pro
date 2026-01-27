@@ -56,8 +56,8 @@ export function AuthHeaderActions({ variant = "light" }: { variant?: "light" | "
         href="/login"
         className={
           variant === "dark"
-            ? "rounded-full border border-white/20 bg-white/10 px-6 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-white/20 hover:border-white/40"
-            : "rounded-full border border-[var(--line)] bg-white px-4 py-2 text-xs font-semibold text-[var(--foreground)] transition hover:-translate-y-0.5"
+            ? "rounded-full bg-[var(--accent)] px-6 py-2 text-sm font-bold text-white transition hover:brightness-110 hover:scale-105 active:scale-95 shadow-md"
+            : "rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 active:scale-95 shadow-sm"
         }
       >
         Sign In
@@ -71,11 +71,10 @@ export function AuthHeaderActions({ variant = "light" }: { variant?: "light" | "
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`h-10 w-10 overflow-hidden rounded-full border transition-all ${
-          variant === "dark"
-            ? "border-white/30 hover:border-white"
-            : "border-[var(--line)] hover:border-[var(--accent)]"
-        }`}
+        className={`h-10 w-10 overflow-hidden rounded-full border transition-all ${variant === "dark"
+          ? "border-white/30 hover:border-white"
+          : "border-[var(--line)] hover:border-[var(--accent)]"
+          }`}
         aria-label="Open profile menu"
       >
         <Image src={avatar} alt="User avatar" width={40} height={40} className="h-full w-full object-cover" />
@@ -83,11 +82,10 @@ export function AuthHeaderActions({ variant = "light" }: { variant?: "light" | "
 
       {isOpen && (
         <div
-          className={`absolute right-0 mt-2 w-56 rounded-2xl border shadow-xl ${
-            variant === "dark"
-              ? "border-white/10 bg-[#151515] text-white"
-              : "border-[var(--line)] bg-white text-[var(--foreground)]"
-          }`}
+          className={`absolute right-0 mt-2 w-56 rounded-2xl border shadow-xl ${variant === "dark"
+            ? "border-white/10 bg-[#151515] text-white"
+            : "border-[var(--line)] bg-white text-[var(--foreground)]"
+            }`}
         >
           <div className="px-4 py-3 border-b border-white/10">
             <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${variant === "dark" ? "text-white/50" : "text-[var(--muted)]"}`}>
@@ -98,18 +96,16 @@ export function AuthHeaderActions({ variant = "light" }: { variant?: "light" | "
           <Link
             href="/analytics"
             onClick={() => setIsOpen(false)}
-            className={`block px-4 py-3 text-sm font-semibold transition ${
-              variant === "dark" ? "hover:bg-white/10" : "hover:bg-[var(--surface-2)]"
-            }`}
+            className={`block px-4 py-3 text-sm font-semibold transition ${variant === "dark" ? "hover:bg-white/10" : "hover:bg-[var(--surface-2)]"
+              }`}
           >
             Analytics
           </Link>
           <Link
             href="/friends"
             onClick={() => setIsOpen(false)}
-            className={`block px-4 py-3 text-sm font-semibold transition ${
-              variant === "dark" ? "hover:bg-white/10" : "hover:bg-[var(--surface-2)]"
-            }`}
+            className={`block px-4 py-3 text-sm font-semibold transition ${variant === "dark" ? "hover:bg-white/10" : "hover:bg-[var(--surface-2)]"
+              }`}
           >
             Friends
           </Link>
@@ -118,9 +114,8 @@ export function AuthHeaderActions({ variant = "light" }: { variant?: "light" | "
               setIsOpen(false);
               signOut();
             }}
-            className={`w-full text-left px-4 py-3 text-sm font-semibold transition ${
-              variant === "dark" ? "hover:bg-white/10" : "hover:bg-[var(--surface-2)]"
-            }`}
+            className={`w-full text-left px-4 py-3 text-sm font-semibold transition ${variant === "dark" ? "hover:bg-white/10" : "hover:bg-[var(--surface-2)]"
+              }`}
           >
             Log Out
           </button>

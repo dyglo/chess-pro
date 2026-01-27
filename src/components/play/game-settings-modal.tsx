@@ -60,7 +60,7 @@ export function GameSettingsModal({
                                     key={level.id}
                                     type="button"
                                     onClick={() => onDifficultyChange(level.id)}
-                                    className={`px-4 py-3 rounded-2xl text-sm font-bold transition-all ${difficulty.id === level.id ? "bg-[var(--foreground)] text-white shadow-lg" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
+                                    className={`px-4 py-3 rounded-2xl text-sm font-bold transition-all ${difficulty.id === level.id ? "bg-[var(--accent)] text-white shadow-lg" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
                                 >
                                     <div className="flex flex-col items-start translate-y-px">
                                         <span>{level.name}</span>
@@ -74,7 +74,7 @@ export function GameSettingsModal({
 
                 <button
                     onClick={onClose}
-                    className="w-full mt-8 bg-[var(--foreground)] text-white py-4 rounded-2xl font-semibold hover:bg-[var(--foreground)]/90 transition-colors"
+                    className="w-full mt-8 bg-[var(--accent)] text-white py-4 rounded-2xl font-bold hover:brightness-110 transition-all shadow-md"
                 >
                     Close
                 </button>

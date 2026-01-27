@@ -39,7 +39,7 @@ export function ActionSidebar({
             {isGameOver && (
                 <button
                     onClick={onRematch}
-                    className="mt-4 px-8 py-2 bg-[#f6e05e] hover:bg-[#ecc94b] text-black font-bold rounded-md transition-colors shadow-lg active:scale-95"
+                    className="mt-4 px-8 py-2 bg-[var(--accent)] hover:brightness-110 text-white font-bold rounded-md transition-all shadow-lg active:scale-95"
                 >
                     Rematch
                 </button>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
 
 function LoginForm() {
     const { signIn } = useAuth();
@@ -69,6 +70,10 @@ function LoginForm() {
             {/* Right Side - Login Form */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-[#FDFCFB]">
                 <div className="w-full max-w-md space-y-8">
+                    <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)] hover:text-[var(--accent)] transition-colors group">
+                        <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                        Back to Home
+                    </Link>
                     <div className="text-center lg:text-left">
                         <h2 className="text-3xl font-black text-[var(--foreground)] tracking-tight">Welcome Back</h2>
                         <p className="text-gray-500 mt-2 font-medium">Please enter your details to sign in.</p>
@@ -135,7 +140,7 @@ function LoginForm() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-[var(--foreground)] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[var(--foreground)]/90 hover:shadow-xl hover:shadow-[var(--foreground)]/10 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
+                            className="w-full bg-[var(--accent)] text-white py-4 rounded-2xl font-bold text-lg hover:brightness-110 hover:shadow-xl hover:shadow-[var(--accent)]/20 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
                         >
                             {isLoading ? (
                                 <span className="flex items-center justify-center gap-2">

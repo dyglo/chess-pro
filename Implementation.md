@@ -1,4 +1,4 @@
-﻿# ChessPro Implementation Plan (2026)
+# ChessPro Implementation Plan (2026)
 
 > Project: ChessPro web app
 > Stack: Next.js 16.1+ (App Router, Turbopack, React 19), Tailwind CSS 4, Shadcn-UI, Lucide React, OpenAI GPT-4o
@@ -133,7 +133,6 @@ Goal: sustainable growth.
 - / (landing)
 - /play
 - /puzzles
-- /analysis
 - /coach
 - /leagues
 - /friends

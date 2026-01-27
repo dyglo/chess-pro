@@ -85,11 +85,11 @@ export default function MatchPage() {
         p_reason: "resign",
         p_duration_seconds: match.started_at
           ? Math.max(
-              1,
-              Math.floor(
-                (Date.now() - new Date(match.started_at).getTime()) / 1000
-              )
+            1,
+            Math.floor(
+              (Date.now() - new Date(match.started_at).getTime()) / 1000
             )
+          )
           : null,
         p_final_fen: gameState.fen,
       });
@@ -110,7 +110,7 @@ export default function MatchPage() {
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans text-[var(--foreground)] selection:bg-[var(--accent)]/20">
       <header className="h-16 lg:h-20 flex items-center justify-between px-4 lg:px-8 border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-40">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 lg:w-10 lg:h-10 bg-[var(--foreground)] rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
+          <div className="w-8 h-8 lg:w-10 lg:h-10 bg-[var(--accent)] rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 shadow-sm">
             <svg className="w-5 h-5 lg:w-6 lg:h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19,22H5V20H19V22M17,10C17,8.89 16.1,8 15,8V7C15,5.89 14.1,5 13,5V4C13,2.89 12.1,2 11,2H9C7.89,2 7,2.89 7,4V5C5.89,5 5,5.89 5,7V8C3.89,8 3,8.89 3,10V18H21V10C21,8.89 20.1,8 19,8V7C19,5.89 18.1,5 17,10M17,18H7V10H17V18Z" />
             </svg>
@@ -127,7 +127,7 @@ export default function MatchPage() {
           <button
             onClick={handleResign}
             disabled={isResigning}
-            className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-[var(--foreground)]"
+            className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 active:scale-95 shadow-sm disabled:opacity-50"
           >
             {isResigning ? "Resigning..." : "Resign"}
           </button>
@@ -155,8 +155,8 @@ export default function MatchPage() {
                 navigator.clipboard.writeText(window.location.href);
               }
             }}
-            onHint={() => {}}
-            onUndo={() => {}}
+            onHint={() => { }}
+            onUndo={() => { }}
             onChat={() => setShowChat(true)}
             onRematch={() => (window.location.href = "/play")}
             isGameOver={gameState.isGameOver}
@@ -237,7 +237,7 @@ export default function MatchPage() {
           setBoardTheme(theme);
         }}
         difficulty={{ id: "easy", name: "Easy", depth: 2, description: "Casual player", rating: "~800" }}
-        onDifficultyChange={() => {}}
+        onDifficultyChange={() => { }}
       />
 
       <ChatModal

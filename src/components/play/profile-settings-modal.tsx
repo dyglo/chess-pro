@@ -220,7 +220,7 @@ export function ProfileSettingsModal({ isOpen, onClose, user, onProfileUpdate }:
                     <button
                         type="submit"
                         disabled={isLoading || uploading}
-                        className="w-full bg-[var(--foreground)] text-white py-3 rounded-xl font-semibold hover:bg-[var(--foreground)]/90 transition-colors disabled:opacity-50"
+                        className="w-full bg-[var(--accent)] text-white py-3 rounded-xl font-bold hover:brightness-110 transition-all shadow-md disabled:opacity-50"
                     >
                         {isLoading ? "Saving..." : "Save Changes"}
                     </button>

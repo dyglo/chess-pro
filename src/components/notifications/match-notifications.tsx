@@ -32,13 +32,13 @@ export function MatchNotifications() {
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => acceptRequest(req.id)}
-              className="flex-1 rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+              className="flex-1 rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm"
             >
               Accept
             </button>
             <button
               onClick={() => declineRequest(req.id)}
-              className="flex-1 rounded-full border border-[var(--line)] px-3 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-[var(--foreground)]"
+              className="flex-1 rounded-full border border-[var(--accent)] bg-white px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--surface-2)] shadow-sm"
             >
               Decline
             </button>
@@ -56,7 +56,7 @@ export function MatchNotifications() {
           </div>
           <Link
             href={`/match/${match.id}`}
-            className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-[var(--accent-3)] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+            className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm"
           >
             Open Match
           </Link>

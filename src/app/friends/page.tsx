@@ -110,7 +110,7 @@ export default function FriendsPage() {
             <Link href="/play" className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
               Back to Game
             </Link>
-            <Link href="/analytics" className="rounded-full bg-[var(--accent-3)] px-4 py-2 text-xs font-semibold text-white">
+            <Link href="/analytics" className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm">
               View Analytics
             </Link>
             <AuthHeaderActions variant="light" />
@@ -162,50 +162,49 @@ export default function FriendsPage() {
             <div className="mt-6 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-[var(--shadow)]">
               <div className="max-h-[520px] overflow-y-auto pr-2">
                 <div className="space-y-3">
-              {filteredProfiles.map((profile) => {
-                const isPending = pendingOutgoing.some((req) => req.recipient_id === profile.id);
-                const isOnline = presence[profile.id]?.is_online ?? false;
+                  {filteredProfiles.map((profile) => {
+                    const isPending = pendingOutgoing.some((req) => req.recipient_id === profile.id);
+                    const isOnline = presence[profile.id]?.is_online ?? false;
 
-                return (
-                  <div key={profile.id} className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="relative h-12 w-12 overflow-hidden rounded-full border border-[var(--line)] bg-white">
-                        <Image
-                          src={profile.avatar_url || "/avatars/user-placeholder.jpg"}
-                          alt={profile.full_name || "Player"}
-                          fill
-                          className="object-cover"
-                        />
+                    return (
+                      <div key={profile.id} className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="relative h-12 w-12 overflow-hidden rounded-full border border-[var(--line)] bg-white">
+                            <Image
+                              src={profile.avatar_url || "/avatars/user-placeholder.jpg"}
+                              alt={profile.full_name || "Player"}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">
+                              {profile.full_name || "Player"}
+                            </p>
+                            <p className="text-xs text-[var(--muted)]">
+                              {isOnline ? "Online" : "Offline"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => sendRequest(profile.id)}
+                          disabled={isPending}
+                          className={`rounded-full px-4 py-2 text-xs font-semibold transition ${isPending
+                              ? "cursor-not-allowed bg-white text-[var(--muted)]"
+                              : "bg-[var(--accent)] text-white hover:opacity-90"
+                            }`}
+                        >
+                          {isPending ? "Requested" : "Send Match Request"}
+                        </button>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {profile.full_name || "Player"}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {isOnline ? "Online" : "Offline"}
-                        </p>
-                      </div>
+                    );
+                  })}
+
+                  {filteredProfiles.length === 0 && (
+                    <div className="rounded-3xl border border-dashed border-[var(--line)] p-10 text-center text-sm text-[var(--muted)]">
+                      {profiles.length === 0 ? "No users found." : "No players match that search."}
                     </div>
-                    <button
-                      onClick={() => sendRequest(profile.id)}
-                      disabled={isPending}
-                      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                        isPending
-                          ? "cursor-not-allowed bg-white text-[var(--muted)]"
-                          : "bg-[var(--accent)] text-white hover:opacity-90"
-                      }`}
-                    >
-                      {isPending ? "Requested" : "Send Match Request"}
-                    </button>
-                  </div>
-                );
-              })}
-
-              {filteredProfiles.length === 0 && (
-                <div className="rounded-3xl border border-dashed border-[var(--line)] p-10 text-center text-sm text-[var(--muted)]">
-                  {profiles.length === 0 ? "No users found." : "No players match that search."}
-                </div>
-              )}
+                  )}
                 </div>
               </div>
             </div>
@@ -223,13 +222,13 @@ export default function FriendsPage() {
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => acceptRequest(req.id)}
-                        className="flex-1 rounded-full bg-[var(--accent-3)] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                        className="flex-1 rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm"
                       >
                         Accept
                       </button>
                       <button
                         onClick={() => declineRequest(req.id)}
-                        className="flex-1 rounded-full border border-[var(--line)] px-3 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-[var(--foreground)]"
+                        className="flex-1 rounded-full border border-[var(--accent)] bg-white px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--surface-2)] shadow-sm"
                       >
                         Decline
                       </button>

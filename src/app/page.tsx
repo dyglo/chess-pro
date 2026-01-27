@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/header";
+import { MessageSquare, Puzzle, Trophy, Users, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function Home() {
   return (
@@ -43,31 +44,37 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="mx-auto w-full max-w-6xl px-6">
+        <div className="mx-auto w-full max-w-6xl px-6 pb-24">
           <section
             id="features"
-            className="mt-24 grid gap-8 md:grid-cols-3"
+            className="mt-32 grid gap-6 md:grid-cols-3"
           >
             {[
               {
                 title: "AI coaching that feels human",
                 text: "Ask why a move works, get a smarter alternative, and build training plans based on your weaknesses.",
+                icon: <MessageSquare className="w-6 h-6 text-[var(--accent)]" />,
               },
               {
                 title: "Daily puzzles, weekly momentum",
                 text: "Puzzles, streaks, and challenges deliver short bursts of progress every session.",
+                icon: <Puzzle className="w-6 h-6 text-[var(--accent)]" />,
               },
               {
                 title: "Leagues that keep you coming back",
                 text: "Season ladders, friend rivalries, and shared goals make every game matter.",
+                icon: <Trophy className="w-6 h-6 text-[var(--accent)]" />,
               },
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-3xl border border-[var(--line)] bg-white p-8 shadow-sm hover:shadow-md transition-shadow"
+                className="group relative overflow-hidden rounded-[32px] border border-[var(--glass-border)] bg-[var(--glass)] p-10 shadow-sm backdrop-blur-md transition-all hover:shadow-xl hover:-translate-y-1"
               >
-                <h3 className="text-xl font-bold">{item.title}</h3>
-                <p className="mt-4 text-sm leading-relaxed text-[var(--muted)]">
+                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                  {item.icon}
+                </div>
+                <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{item.title}</h3>
+                <p className="mt-5 text-[15px] leading-relaxed text-[var(--muted)]">
                   {item.text}
                 </p>
               </div>
@@ -76,69 +83,89 @@ export default function Home() {
 
           <section
             id="community"
-            className="mt-24 grid gap-8 rounded-[40px] border border-[var(--line)] bg-[var(--surface)] p-10 shadow-sm md:grid-cols-[1.2fr_0.8fr]"
+            className="mt-32 overflow-hidden rounded-[48px] border border-[var(--line)] bg-[var(--surface)] p-2 shadow-sm"
           >
-            <div className="space-y-6">
-              <h2 className="text-4xl font-bold">Built for social play</h2>
-              <p className="text-lg text-[var(--muted)]">
-                Friend lists, live challenges, and league standings keep casual
-                players and competitors aligned. Share highlight clips and
-                celebrate streaks together.
-              </p>
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Link
-                  href="#"
-                  className="rounded-full bg-[var(--accent-3)] px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5"
-                >
-                  Join Leagues
-                </Link>
-                <Link
-                  href="#"
-                  className="rounded-full border border-[var(--line)] bg-white px-8 py-3 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5"
-                >
-                  Find Friends
-                </Link>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-[var(--line)] bg-white p-8 shadow-inner">
-              <div className="space-y-6 text-sm text-[var(--muted)]">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-black text-lg">Weekly League</span>
-                  <span className="rounded-full bg-[var(--accent-2)] px-4 py-1.5 text-xs font-bold text-black uppercase tracking-wider">
-                    Live
-                  </span>
+            <div className="grid gap-12 p-8 md:grid-cols-[1fr_0.8fr] md:p-16">
+              <div className="flex flex-col justify-center space-y-8">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-[var(--muted)]">
+                  <Users className="w-3.5 h-3.5" />
+                  Community
                 </div>
-                <div className="space-y-3">
-                  {["Rhea", "Tariq", "Kaito", "Selene"].map((name, index) => (
-                    <div
-                      key={name}
-                      className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
-                    >
-                      <span className="font-medium text-black">{name}</span>
-                      <span className="text-xs font-bold text-[var(--accent-3)]">
-                        +{18 - index * 3} LP
-                      </span>
+                <h2 className="text-5xl font-bold leading-[1.1] tracking-tight text-[var(--foreground)]">Built for social play</h2>
+                <p className="max-w-md text-lg leading-relaxed text-[var(--muted)]">
+                  Friend lists, live challenges, and league standings keep casual
+                  players and competitors aligned. Share highlight clips and
+                  celebrate streaks together.
+                </p>
+                <div className="flex flex-wrap gap-4 pt-4">
+                  <Link
+                    href="#"
+                    className="rounded-full bg-[var(--accent)] px-10 py-4 text-sm font-bold text-white shadow-lg transition hover:brightness-110 hover:shadow-xl active:scale-95"
+                  >
+                    Join Leagues (Coming Soon)
+                  </Link>
+                  <Link
+                    href="#"
+                    className="rounded-full border border-[var(--line)] bg-white px-10 py-4 text-sm font-bold text-[var(--foreground)] shadow-sm transition hover:bg-[var(--surface-2)] active:scale-95"
+                  >
+                    Find Friends
+                  </Link>
+                </div>
+              </div>
+
+              <div className="relative rounded-[40px] border border-[var(--line)] bg-white p-10 shadow-inner">
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Competition</span>
+                      <h4 className="text-xl font-bold text-black">Weekly League</h4>
                     </div>
-                  ))}
+                    <span className="flex items-center gap-1.5 rounded-full bg-[var(--accent-2)] px-4 py-2 text-[10px] font-black text-black uppercase tracking-widest shadow-sm">
+                      Coming Soon
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {["Rhea", "Tariq", "Kaito", "Selene"].map((name, index) => (
+                      <div
+                        key={name}
+                        className="group flex items-center justify-between rounded-2xl border border-[var(--line)] bg-white px-5 py-4 transition-all hover:bg-[var(--surface-2)] hover:shadow-sm"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-bold text-[var(--muted)] group-hover:bg-white transition-colors">
+                            {index + 1}
+                          </div>
+                          <span className="font-bold text-[var(--foreground)]">{name}</span>
+                        </div>
+                        <span className="font-black text-[var(--accent)]">
+                          +{18 - index * 3} LP
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section id="pricing" className="mt-24 text-center">
-            <div className="mx-auto max-w-2xl space-y-6">
-              <h2 className="text-4xl font-bold">
+          <section id="pricing" className="mt-32 text-center">
+            <div className="mx-auto max-w-3xl space-y-10">
+              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-[var(--muted)]">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--accent-2)]" />
+                Premium Experience
+              </div>
+              <h2 className="text-5xl font-bold tracking-tight text-[var(--foreground)]">
                 Free to start. Premium when you&apos;re ready.
               </h2>
-              <p className="text-lg text-[var(--muted)] leading-relaxed">
+              <p className="mx-auto max-w-2xl text-xl leading-relaxed text-[var(--muted)]">
                 Enjoy core play and puzzles with light ads, or upgrade for deep
                 analysis, advanced AI coaching, and ad‑free focus.
               </p>
               <Link
                 href="#"
-                className="inline-flex rounded-full bg-[var(--accent)] px-10 py-4 text-sm font-bold text-white shadow-[var(--shadow)] transition hover:scale-105 active:scale-95"
+                className="inline-flex rounded-full bg-[var(--accent)] px-12 py-5 text-sm font-black text-white shadow-2xl transition hover:brightness-110 active:scale-95"
               >
-                Start Free
+                Start Your Journey Free
               </Link>
             </div>
           </section>
