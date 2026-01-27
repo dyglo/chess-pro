@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import Image from "next/image";
 
-export default function LoginPage() {
+function LoginForm() {
     const { signIn } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const emailParam = useMemo(() => searchParams.get("email") ?? "", [searchParams]);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export default function LoginPage() {
         setError(null);
         setIsLoading(true);
 
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email || emailParam, password);
 
         if (error) {
             setError(error.message);
@@ -85,7 +87,7 @@ export default function LoginPage() {
                                     </div>
                                     <input
                                         type="email"
-                                        value={email}
+                                        value={email || emailParam}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="block w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-[var(--foreground)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] focus:bg-white transition-all font-medium"
                                         placeholder="you@example.com"
@@ -160,5 +162,13 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={null}>
+            <LoginForm />
+        </Suspense>
     );
 }

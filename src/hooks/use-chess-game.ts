@@ -1,27 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Chess, Move, Square, PieceSymbol, Color } from "chess.js";
+import { Chess, Square, PieceSymbol } from "chess.js";
 import { getDifficultyById, DifficultyLevel, defaultDifficulty } from "@/lib/board-themes";
-
-export interface CapturedPieces {
-    white: PieceSymbol[];
-    black: PieceSymbol[];
-}
-
-export interface GameState {
-    fen: string;
-    turn: Color;
-    isCheck: boolean;
-    isCheckmate: boolean;
-    isStalemate: boolean;
-    isDraw: boolean;
-    isGameOver: boolean;
-    moveHistory: Move[];
-    capturedPieces: CapturedPieces;
-    lastMove: { from: Square; to: Square } | null;
-    winner: "white" | "black" | "draw" | null;
-}
+import { buildGameState, GameState } from "@/lib/chess-state";
 
 export interface UseChessGameOptions {
     playerColor?: "w" | "b";
@@ -51,36 +33,9 @@ export function useChessGame(options: UseChessGameOptions = {}) {
     useEffect(() => { whiteTimeRef.current = whiteTime; }, [whiteTime]);
     useEffect(() => { blackTimeRef.current = blackTime; }, [blackTime]);
 
-    const getGameState = useCallback((game: Chess): GameState => {
-        const history = game.history({ verbose: true });
-        const capturedPieces = getCapturedPieces(history);
-        const lastMove = history.length > 0
-            ? { from: history[history.length - 1].from, to: history[history.length - 1].to }
-            : null;
+    const getGameState = useCallback((game: Chess): GameState => buildGameState(game), []);
 
-        let winner: "white" | "black" | "draw" | null = null;
-        if (game.isCheckmate()) {
-            winner = game.turn() === "w" ? "black" : "white";
-        } else if (game.isDraw() || game.isStalemate()) {
-            winner = "draw";
-        }
-
-        return {
-            fen: game.fen(),
-            turn: game.turn(),
-            isCheck: game.isCheck(),
-            isCheckmate: game.isCheckmate(),
-            isStalemate: game.isStalemate(),
-            isDraw: game.isDraw(),
-            isGameOver: game.isGameOver(),
-            moveHistory: history,
-            capturedPieces,
-            lastMove,
-            winner,
-        };
-    }, []);
-
-    const [gameState, setGameState] = useState<GameState>(() => getGameState(new Chess()));
+    const [gameState, setGameState] = useState<GameState>(() => buildGameState(new Chess()));
 
 
     const updateState = useCallback(() => {
@@ -268,21 +223,4 @@ export function useChessGame(options: UseChessGameOptions = {}) {
         getBestMove,
         gameRef, // Exposing gameRef if needed for validation, but getBestMove handles it
     };
-}
-
-function getCapturedPieces(history: Move[]): CapturedPieces {
-    const captured: CapturedPieces = { white: [], black: [] };
-
-    for (const move of history) {
-        if (move.captured) {
-            // If white moved and captured, the captured piece was black
-            if (move.color === "w") {
-                captured.black.push(move.captured as PieceSymbol);
-            } else {
-                captured.white.push(move.captured as PieceSymbol);
-            }
-        }
-    }
-
-    return captured;
 }

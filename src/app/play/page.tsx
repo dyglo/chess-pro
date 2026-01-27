@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Square } from "chess.js";
+import { Chess, Square } from "chess.js";
 import Link from "next/link";
-import { useChessGame, GameState } from "@/hooks/use-chess-game";
+import { useChessGame } from "@/hooks/use-chess-game";
+import type { GameState } from "@/lib/chess-state";
 import { BoardTheme, getThemeById, defaultTheme, DifficultyLevel, getDifficultyById, defaultDifficulty } from "@/lib/board-themes";
 import { ChessBoardWrapper } from "@/components/play/chess-board-wrapper";
 import { SignInPromptModal } from "@/components/play/sign-in-prompt-modal";
@@ -18,9 +19,11 @@ import { UserDropdown } from "@/components/play/user-dropdown";
 import { ChatModal } from "@/components/play/chat-modal";
 import { HintModal } from "@/components/play/hint-modal";
 import { GameSettingsModal } from "@/components/play/game-settings-modal";
+import { analyzeMoveQuality } from "@/lib/chess-engine";
 
 const THEME_STORAGE_KEY = "chesspro-board-theme";
 const DIFFICULTY_STORAGE_KEY = "chesspro-difficulty";
+const INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 export default function PlayPage() {
     const { user, signOut } = useAuth();
@@ -39,6 +42,7 @@ export default function PlayPage() {
     const [showChat, setShowChat] = useState(false);
     const [showHint, setShowHint] = useState(false);
     const [isHintLoading, setIsHintLoading] = useState(false);
+    const [hintsUsed, setHintsUsed] = useState(0);
 
     const [hintMove, setHintMove] = useState<{ from: Square; to: Square } | null>(null);
 
@@ -53,6 +57,7 @@ export default function PlayPage() {
 
                 const result = winner === "white" ? "win" : winner === "black" ? "loss" : "draw";
                 const durationSeconds = 600 - Math.min(timeState.whiteTime, timeState.blackTime);
+                const accuracyScore = calculateAccuracy(finalState.moveHistory, playerColor);
 
                 await supabase.from("game_analytics").insert({
                     user_id: user.id,
@@ -61,13 +66,30 @@ export default function PlayPage() {
                     player_color: playerColor,
                     duration_seconds: durationSeconds,
                     moves_count: finalState.moveHistory.length,
-                    hints_used: 0
+                    hints_used: hintsUsed
+                });
+
+                await supabase.from("games").insert({
+                    game_type: "ai",
+                    white_user_id: user.id,
+                    black_user_id: null,
+                    winner_color: winner,
+                    ai_difficulty: difficulty.id,
+                    duration_seconds: durationSeconds,
+                    moves_count: finalState.moveHistory.length,
+                    hints_used: hintsUsed,
+                    accuracy_score: accuracyScore,
+                    initial_fen: INITIAL_FEN,
+                    final_fen: finalState.fen,
+                    started_at: new Date(Date.now() - durationSeconds * 1000).toISOString(),
+                    ended_at: new Date().toISOString(),
                 });
             } catch (error) {
                 console.error("Error saving game analytics:", error);
             }
         }
-    }, [user, difficulty.id, playerColor]);
+        setHintsUsed(0);
+    }, [user, difficulty.id, playerColor, hintsUsed]);
 
     const {
         gameState,
@@ -76,7 +98,6 @@ export default function PlayPage() {
         blackTime,
         makeMove,
         newGame,
-        resign: _resign,
         undoMove: _undoMove,
         getLegalMoves,
         changeDifficulty,
@@ -140,6 +161,7 @@ export default function PlayPage() {
         try {
             const move = await getBestMove();
             setHintMove(move);
+            setHintsUsed((count) => count + 1);
         } catch (error) {
             console.error("Hint error:", error);
         } finally {
@@ -153,6 +175,11 @@ export default function PlayPage() {
             return;
         }
         setShowChat(true);
+    };
+
+    const handleNewGame = () => {
+        setHintsUsed(0);
+        newGame();
     };
 
     return (
@@ -210,13 +237,14 @@ export default function PlayPage() {
                     />
 
                     <ActionSidebar
-                        onNewGame={() => newGame()}
+                        onNewGame={handleNewGame}
                         onSettings={() => setShowGameSettings(true)}
                         onFlip={() => { }}
                         onShare={() => { }}
                         onHint={handleHint}
+                        onUndo={() => _undoMove()}
                         onChat={handleChat}
-                        onRematch={() => newGame()}
+                        onRematch={handleNewGame}
                         isGameOver={gameState.isGameOver}
                     />
 
@@ -287,13 +315,14 @@ export default function PlayPage() {
                             isActive={gameState.turn === "w"}
                         />
                         <ActionSidebar
-                            onNewGame={() => newGame()}
+                        onNewGame={handleNewGame}
                             onSettings={() => setShowGameSettings(true)}
                             onFlip={() => { }}
                             onShare={() => { }}
                             onHint={handleHint}
+                            onUndo={() => _undoMove()}
                             onChat={handleChat}
-                            onRematch={() => newGame()}
+                        onRematch={handleNewGame}
                             isGameOver={gameState.isGameOver}
                         />
                     </div>
@@ -324,7 +353,7 @@ export default function PlayPage() {
                 moveCount={gameState.moveHistory.length}
                 onNewGame={() => {
                     setShowGameEndModal(false);
-                    newGame();
+                    handleNewGame();
                 }}
             />
 
@@ -358,4 +387,34 @@ export default function PlayPage() {
             />
         </div>
     );
+}
+
+function calculateAccuracy(moveHistory: GameState["moveHistory"], playerColor: "w" | "b") {
+    if (moveHistory.length === 0) return null;
+    const game = new Chess();
+    const scores: Record<string, number> = {
+        brilliant: 1,
+        good: 0.8,
+        inaccuracy: 0.5,
+        mistake: 0.3,
+        blunder: 0.1,
+    };
+
+    let total = 0;
+    let count = 0;
+
+    for (const move of moveHistory) {
+        if (move.color !== playerColor) {
+            game.move(move);
+            continue;
+        }
+        const before = new Chess(game.fen());
+        const quality = analyzeMoveQuality(before, move);
+        total += scores[quality];
+        count += 1;
+        game.move(move);
+    }
+
+    if (count === 0) return null;
+    return Math.round((total / count) * 100);
 }

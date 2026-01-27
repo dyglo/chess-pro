@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Source_Sans_3, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/hooks/use-auth";
+import { NotificationShell } from "@/components/notifications/notification-shell";
 
 const displayFont = Space_Grotesk({
   variable: "--font-display",
@@ -34,7 +35,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <NotificationShell />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User, Session, AuthError } from "@supabase/supabase-js";
 
@@ -24,15 +24,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        let isMounted = true;
+        const syncSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!isMounted) return;
             setSession(session);
             setUser(session?.user ?? null);
             setIsLoading(false);
-        });
+        };
+
+        syncSession();
 
         // Listen for auth changes
         const {
@@ -43,7 +47,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        const handleFocus = () => {
+            syncSession();
+        };
+
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                syncSession();
+            }
+        };
+
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibility);
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
     }, [supabase.auth]);
 
     const signUp = async (

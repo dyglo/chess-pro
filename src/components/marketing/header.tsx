@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import { AuthHeaderActions } from "@/components/auth/auth-header-actions";
 
 const navItems = [
   { label: "Play", href: "/play" },
@@ -41,12 +42,7 @@ export function MarketingHeader() {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-4">
-          <Link
-            href="/login"
-            className="rounded-full border border-white/20 bg-white/10 px-6 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-white/20 hover:border-white/40"
-          >
-            Sign In
-          </Link>
+          <AuthHeaderActions variant="dark" />
           <Link
             href="/login"
             className="rounded-full bg-[var(--accent)] px-6 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-[var(--accent)] hover:scale-105 active:scale-95"
@@ -79,13 +75,9 @@ export function MarketingHeader() {
                 </Link>
               ))}
               <div className="flex flex-col gap-4 mt-8 w-full px-8">
-                <Link
-                  href="/login"
-                  className="w-full text-center rounded-full border border-white/20 bg-white/10 px-6 py-4 text-base font-bold text-white transition active:scale-95"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Sign In
-                </Link>
+                <div className="flex justify-center">
+                  <AuthHeaderActions variant="dark" />
+                </div>
                 <Link
                   href="/login"
                   className="w-full text-center rounded-full bg-[var(--accent)] px-6 py-4 text-base font-bold text-white shadow-lg transition active:scale-95"

@@ -10,7 +10,7 @@ interface ChessBoardWrapperProps {
     theme: BoardTheme;
     playerColor: "w" | "b";
     lastMove: { from: Square; to: Square } | null;
-    onPieceDrop: (sourceSquare: Square, targetSquare: Square) => boolean;
+    onPieceDrop: (sourceSquare: Square, targetSquare: Square) => boolean | Promise<boolean>;
     getLegalMoves: (square: Square) => Square[];
     hintMove?: { from: Square; to: Square } | null;
     isThinking?: boolean;
@@ -78,14 +78,14 @@ export function ChessBoardWrapper({
     }
 
     // Handle square click
-    const handleSquareClick = useCallback(({ square }: { piece: { pieceType: string } | null; square: string }) => {
+    const handleSquareClick = useCallback(async ({ square }: { piece: { pieceType: string } | null; square: string }) => {
         if (isThinking) return;
 
         const sq = square as Square;
 
         // If clicking on a legal move destination, make the move
         if (selectedSquare && legalMoves.includes(sq)) {
-            const success = onPieceDrop(selectedSquare, sq);
+            const success = await Promise.resolve(onPieceDrop(selectedSquare, sq));
             if (success) {
                 setSelectedSquare(null);
                 setLegalMoves([]);

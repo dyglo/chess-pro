@@ -7,6 +7,7 @@ interface ActionSidebarProps {
     onFlip: () => void;
     onShare: () => void;
     onHint: () => void;
+    onUndo: () => void;
     onChat: () => void;
     onRematch: () => void;
     isGameOver?: boolean;
@@ -18,6 +19,7 @@ export function ActionSidebar({
     onFlip,
     onShare,
     onHint,
+    onUndo,
     onChat,
     onRematch,
     isGameOver
@@ -30,6 +32,7 @@ export function ActionSidebar({
                 <SidebarIcon icon={<FlipIcon />} label="Flip board" shortcut="F" onClick={onFlip} />
                 <SidebarIcon icon={<ShareIcon />} label="Share game" onClick={onShare} />
                 <SidebarIcon icon={<HintIcon />} label="Hint" onClick={onHint} />
+                <SidebarIcon icon={<UndoIcon />} label="Undo" onClick={onUndo} />
                 <SidebarIcon icon={<ChatIcon />} label="Chat (soon)" onClick={onChat} />
             </div>
 
@@ -106,6 +109,15 @@ function ChatIcon() {
     return (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
             <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function UndoIcon() {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
+            <path d="M9 14l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 10h9a5 5 0 110 10h-4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
 }
