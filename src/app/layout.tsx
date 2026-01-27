@@ -3,6 +3,7 @@ import { Source_Sans_3, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/hooks/use-auth";
 import { NotificationShell } from "@/components/notifications/notification-shell";
+import { Analytics } from "@vercel/analytics/next";
 
 const displayFont = Space_Grotesk({
   variable: "--font-display",
@@ -39,6 +40,7 @@ export default function RootLayout({
           <NotificationShell />
           {children}
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
