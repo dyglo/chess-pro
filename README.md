@@ -1,10 +1,10 @@
 # Chess Pro
 
-Experience the pinnacle of competitive chess. Play against global grandmasters, analyze your moves with cutting-edge AI, and master the board.
+Experience the pinnacle of competitive chess. Play against global grandmasters, analyze your moves with cutting-edge AI, and master the board Game.
 
 ## Features
 
-- **AI Coaching**: Get real-time feedback, "Ask why" analysis, and personalized training plans.
+- **AI Coaching**: Get real-time feedback, "Ask why" analysis, and personalized training plans for all users.
 - **Competitve Leagues**: Join season ladders, challenge friends, and climb the ranks.
 - **Daily Puzzles**: Maintain your momentum with daily challenges and streak tracking.
 - **Social Play**: Friend lists, live challenges, and highlight sharing.
