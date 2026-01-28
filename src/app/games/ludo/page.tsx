@@ -108,7 +108,7 @@ function LudoGameContent() {
         handleTokenMove,
         newGame,
         isCurrentPlayerAi,
-    } = useRealtimeMode ? { ...realtimeGame, isConnected: realtimeGame.isConnected } : { ...legacyGame, isConnected: true };
+    } = useRealtimeMode ? { ...realtimeGame } : { ...legacyGame };
 
     // Get display name for player
     const getPlayerName = (playerIndex: number) => {

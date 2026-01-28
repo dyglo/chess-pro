@@ -133,6 +133,52 @@ export function useRealtimeMatchState(options: UseRealtimeMatchStateOptions) {
         fetchState().finally(() => setIsLoading(false));
     }, [fetchState]);
 
+    // Apply an event to the local state
+    const applyEvent = useCallback((event: MatchEvent) => {
+        setMatch((prev) => {
+            if (!prev) return prev;
+
+            const newState = { ...prev.state };
+
+            switch (event.event_type) {
+                case "ludo_roll":
+                    newState.diceValue = event.payload.diceValue;
+                    break;
+
+                case "ludo_move":
+                    newState.diceValue = null;
+                    newState.currentPlayerIndex = event.payload.nextSeat;
+                    if (event.payload.winner !== null) {
+                        newState.winner = event.payload.winner;
+                    }
+                    // Token positions are updated via the full state refresh
+                    // For now, trigger a state refetch to get updated tokens
+                    fetchState();
+                    break;
+
+            case "turn_skip":
+            case "TURN_SKIPPED":
+                newState.diceValue = null;
+                if (event.payload?.nextSeat !== undefined && event.payload?.nextSeat !== null) {
+                    newState.currentPlayerIndex = event.payload.nextSeat;
+                }
+                break;
+
+                case "chess_move":
+                    newState.fen = event.payload.fen;
+                    newState.currentTurn = typeof event.payload.fen === "string" ? event.payload.fen.split(" ")[1] : "w";
+                    newState.moveCount = event.payload.moveNumber;
+                    break;
+            }
+
+            return {
+                ...prev,
+                state: newState,
+                version: event.seq,
+            };
+        });
+    }, [fetchState]);
+
     // Setup realtime subscription with reconnect handling
     useEffect(() => {
         if (!matchId) return;
@@ -238,52 +284,6 @@ export function useRealtimeMatchState(options: UseRealtimeMatchStateOptions) {
             supabase.removeChannel(channel);
         };
     }, [matchId, supabase, fetchState, onEvent, onReconnect, applyEvent]);
-
-    // Apply an event to the local state
-    const applyEvent = useCallback((event: MatchEvent) => {
-        setMatch((prev) => {
-            if (!prev) return prev;
-
-            const newState = { ...prev.state };
-
-            switch (event.event_type) {
-                case "ludo_roll":
-                    newState.diceValue = event.payload.diceValue;
-                    break;
-
-                case "ludo_move":
-                    newState.diceValue = null;
-                    newState.currentPlayerIndex = event.payload.nextSeat;
-                    if (event.payload.winner !== null) {
-                        newState.winner = event.payload.winner;
-                    }
-                    // Token positions are updated via the full state refresh
-                    // For now, trigger a state refetch to get updated tokens
-                    fetchState();
-                    break;
-
-            case "turn_skip":
-            case "TURN_SKIPPED":
-                newState.diceValue = null;
-                if (event.payload?.nextSeat !== undefined && event.payload?.nextSeat !== null) {
-                    newState.currentPlayerIndex = event.payload.nextSeat;
-                }
-                break;
-
-                case "chess_move":
-                    newState.fen = event.payload.fen;
-                    newState.currentTurn = typeof event.payload.fen === "string" ? event.payload.fen.split(" ")[1] : "w";
-                    newState.moveCount = event.payload.moveNumber;
-                    break;
-            }
-
-            return {
-                ...prev,
-                state: newState,
-                version: event.seq,
-            };
-        });
-    }, [fetchState]);
 
     // Get my seat/player info
     const myPlayer = useMemo(() => {
