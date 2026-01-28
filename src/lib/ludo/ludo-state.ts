@@ -27,6 +27,8 @@ export interface LudoState {
         name: string;
         color: PlayerColor;
         isAi: boolean;
+        avatarUrl?: string | null;
+        country?: string | null;
     }[];
     tokens: Token[];
     currentPlayerIndex: number;

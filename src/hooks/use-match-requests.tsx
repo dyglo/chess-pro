@@ -226,8 +226,17 @@ export function useMatchRequests() {
         const { data, error: rpcError } = await supabase.rpc("accept_ludo_match_request", {
           request_id: requestId,
         });
-        if (rpcError) return { error: rpcError.message, matchId: null, sessionId: null, gameType };
-        await refresh();
+
+        if (rpcError) {
+          console.error("Ludo RPC Error:", rpcError);
+          return { error: rpcError.message, matchId: null, sessionId: null, gameType };
+        }
+
+        console.log("Ludo RPC Success, Session ID:", data);
+
+        // Refresh in background so we don't block the UI redirect
+        refresh().catch(console.error);
+
         return { error: null, matchId: null, sessionId: data as string, gameType };
       } else {
         // Call Chess RPC (existing logic)
@@ -235,7 +244,7 @@ export function useMatchRequests() {
           request_id: requestId,
         });
         if (rpcError) return { error: rpcError.message, matchId: null, sessionId: null, gameType };
-        await refresh();
+        refresh().catch(console.error);
         return { error: null, matchId: data as string, sessionId: null, gameType };
       }
     },

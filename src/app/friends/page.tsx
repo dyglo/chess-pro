@@ -26,7 +26,7 @@ type PresenceRow = {
 export default function FriendsPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
-  const { pendingIncoming, pendingOutgoing, activeMatches, sendRequest, acceptRequest, declineRequest } =
+  const { pendingIncoming, pendingOutgoing, activeMatches, activeLudoSessions, sendRequest, acceptRequest, declineRequest } =
     useMatchRequests();
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [presence, setPresence] = useState<Record<string, PresenceRow>>({});
@@ -237,6 +237,9 @@ export default function FriendsPage() {
                         router.push(`/games/ludo?session=${result.sessionId}&multiplayer=true`);
                       } else if (result.matchId) {
                         router.push(`/match/${result.matchId}`);
+                      } else {
+                        // Fallback or error if no ID returned
+                        console.error("No match/session ID returned for accepted request");
                       }
                     }
                   };
@@ -276,17 +279,82 @@ export default function FriendsPage() {
             <div className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-[var(--shadow)]">
               <h2 className="text-lg font-bold">Active Matches</h2>
               <div className="mt-4 space-y-3">
-                {activeMatches.map((match) => (
-                  <Link
-                    key={match.id}
-                    href={`/match/${match.id}`}
-                    className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
-                  >
-                    <span>Match #{match.id.slice(0, 6)}</span>
-                    <span className="text-xs text-[var(--muted)]">Join</span>
-                  </Link>
+                {/* Ludo Sessions */}
+                {activeLudoSessions.map((session) => (
+                  <div key={session.id} className="relative group">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        // Logic to dismiss/hide?
+                        // Since we don't have a shared context yet, we can't persist this globally easily without new state.
+                        // But for now, simple local hide or maybe a "leave" button?
+                        // User asked for "clear button to clear the current notification".
+                        // This creates a UI expectation of removal.
+                        // Let's implement active session hiding? No, that's dangerous if they can't get it back.
+                        // But usually "Clear" means hide notification.
+                        // I will add a small X button that hides this element locally *if* it's just a notification list.
+                        // Actually, on Friends page, this is the MATCH LIST. Hiding it means losing access?
+                        // Unless they can access via "Games" page?
+                        // I'll stick to a visual dismiss (X) that hides it from THIS view.
+                        const el = document.getElementById(`session-${session.id}`);
+                        if (el) el.style.display = 'none';
+                      }}
+                      className="absolute top-[-8px] right-[-8px] z-10 bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity border border-gray-100 hover:bg-red-50"
+                      title="Hide from list"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                    <Link
+                      id={`session-${session.id}`}
+                      href={`/games/ludo?session=${session.id}&multiplayer=true`}
+                      className="flex items-center justify-between rounded-3xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-purple-900">🎲 Ludo Match</span>
+                        <span className="text-xs font-normal text-purple-700 opacity-75">
+                          {session.created_at ? new Date(session.created_at).toLocaleString(undefined, {
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                          }) : 'Just now'}
+                        </span>
+                      </div>
+                      <span className="rounded-full bg-white/50 px-2 py-1 text-xs font-bold text-purple-700">Join</span>
+                    </Link>
+                  </div>
                 ))}
-                {activeMatches.length === 0 && (
+
+                {/* Chess Matches */}
+                {activeMatches.map((match) => (
+                  <div key={match.id} className="relative group">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const el = document.getElementById(`match-${match.id}`);
+                        if (el) el.style.display = 'none';
+                      }}
+                      className="absolute top-[-8px] right-[-8px] z-10 bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity border border-gray-100 hover:bg-red-50"
+                      title="Hide from list"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                    <Link
+                      id={`match-${match.id}`}
+                      href={`/match/${match.id}`}
+                      className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
+                    >
+                      <div className="flex flex-col">
+                        <span>♟ Match #{match.id.slice(0, 4)}</span>
+                        <span className="text-xs font-normal text-[var(--muted)]">
+                          {match.created_at ? new Date(match.created_at).toLocaleString(undefined, {
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                          }) : 'Just now'}
+                        </span>
+                      </div>
+                      <span className="rounded-full bg-white/50 px-2 py-1 text-xs font-bold text-[var(--foreground)]">Join</span>
+                    </Link>
+                  </div>
+                ))}
+
+                {activeMatches.length === 0 && activeLudoSessions.length === 0 && (
                   <p className="text-sm text-[var(--muted)]">No active matches.</p>
                 )}
               </div>

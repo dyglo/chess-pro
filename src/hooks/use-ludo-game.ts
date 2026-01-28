@@ -35,40 +35,21 @@ interface LudoPlayer {
 }
 
 export function useLudoGame(options: UseLudoGameOptions) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { userId, userProfile, onGameEnd, existingSessionId: _existingSessionId, isMultiplayer: _isMultiplayer } = options;
+    const { userId, userProfile, onGameEnd, existingSessionId, isMultiplayer } = options;
     const supabase = createClient();
 
-    // TODO: Implement full multiplayer support using _existingSessionId and _isMultiplayer
-    // These params are passed from friend request acceptance but full realtime sync
-    // between players requires additional work similar to useRealtimeMatch for Chess
-
-
-    // Create initial state with user as player 1
+    // Create initial state
     const createGameState = useCallback((): LudoState => {
         const playerName = userProfile?.full_name || userProfile?.username || "Player 1";
-        const state = createInitialState([playerName, "AI 1", "AI 2", "AI 3"]);
-
-        // Update player 0 with user info
-        if (userId) {
-            state.players[0] = {
-                ...state.players[0],
-                id: userId,
-                name: playerName,
-                isAi: false,
-            };
-        }
-
-        return state;
-    }, [userId, userProfile]);
+        return createInitialState([playerName, "AI 1", "AI 2", "AI 3"]);
+    }, [userProfile]);
 
     const [state, setState] = useState<LudoState>(() => createGameState());
-    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(existingSessionId || null);
     const [isRolling, setIsRolling] = useState(false);
     const [validMoveTokenIds, setValidMoveTokenIds] = useState<number[]>([]);
-    const [logs, setLogs] = useState<string[]>(["Welcome to LudoPro.", "Game started!"]);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [_isLoading, _setIsLoading] = useState(false);
+    const [logs, setLogs] = useState<string[]>(["Welcome to LudoPro."]);
+    const [isLoading, setIsLoading] = useState(!!existingSessionId);
 
     const aiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -76,9 +57,126 @@ export function useLudoGame(options: UseLudoGameOptions) {
         setLogs((prev) => [msg, ...prev].slice(0, 50));
     }, []);
 
-    // Create session in Supabase
+    // Fetch existing session data
+    const fetchSession = useCallback(async () => {
+        if (!sessionId) return;
+        setIsLoading(true);
+        try {
+            // Fetch session
+            const { data: sessionData, error: sessionError } = await supabase
+                .from("ludo_sessions")
+                .select("*")
+                .eq("id", sessionId)
+                .single();
+
+            if (sessionError) throw sessionError;
+
+            // Fetch players
+            const { data: playersData, error: playersError } = await supabase
+                .from("ludo_players")
+                .select("*")
+                .eq("session_id", sessionId)
+                .order("player_index", { ascending: true });
+
+            if (playersError) throw playersError;
+
+            // Fetch profiles for players with user_ids
+            const userIds = playersData
+                .map((p: { user_id: string }) => p.user_id)
+                .filter((id: string) => id);
+
+            let profilesMap: Record<string, { id: string; full_name?: string; username?: string; avatar_url?: string; country?: string }> = {};
+            if (userIds.length > 0) {
+                const { data: profiles, error: profilesError } = await supabase
+                    .from("profiles")
+                    .select("id, full_name, username, avatar_url, country")
+                    .in("id", userIds);
+
+                if (!profilesError && profiles) {
+                    profilesMap = profiles.reduce((acc, profile) => {
+                        acc[profile.id] = profile;
+                        return acc;
+                    }, {} as Record<string, typeof profiles[0]>);
+                }
+            }
+
+            // Fetch tokens
+            const { data: tokensData, error: tokensError } = await supabase
+                .from("ludo_tokens")
+                .select("*")
+                .eq("session_id", sessionId);
+
+            if (tokensError) throw tokensError;
+
+            // Reconstruct state
+            const newState = createGameState();
+
+            // Update players
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            playersData.forEach((p: any) => {
+                const profile = p.user_id ? profilesMap[p.user_id] : null;
+                const displayName = profile
+                    ? (profile.full_name || profile.username || "Player")
+                    : (p.name || (p.user_id ? "Player" : `AI ${p.player_index}`));
+
+                newState.players[p.player_index] = {
+                    id: p.user_id || `p${p.player_index}`,
+                    name: displayName,
+                    color: ["blue", "red", "green", "yellow"][p.player_index] as PlayerColor,
+                    isAi: p.is_ai,
+                    avatarUrl: profile?.avatar_url,
+                    country: profile?.country,
+                };
+            });
+
+            // Update tokens
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            tokensData.forEach((t: any) => {
+                // Find local token that matches player/index
+                const localTokenIndex = newState.tokens.findIndex(
+                    lt => lt.playerIndex === t.player_index && (lt.id % 4) === t.token_index
+                );
+                if (localTokenIndex !== -1) {
+                    newState.tokens[localTokenIndex].position = t.position;
+                }
+            });
+
+            newState.currentPlayerIndex = sessionData.current_player_index;
+            newState.gameStatus = sessionData.status;
+            newState.winner = sessionData.winner_index;
+            newState.diceValue = sessionData.dice_value;
+
+            // Calculate valid moves if dice was already rolled
+            if (newState.diceValue !== null) {
+                const moves = getValidMoves(newState, newState.diceValue);
+                setValidMoveTokenIds(moves);
+            }
+
+            setState(newState);
+            addLog("Joined multiplayer session.");
+
+        } catch (err) {
+            console.error("Error fetching session:", err);
+            addLog("Error joining session.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [sessionId, supabase, createGameState, addLog]);
+
+    // Initial fetch if joining
+    useEffect(() => {
+        if (existingSessionId && !state.players[0].id.startsWith("p")) {
+            // Only fetch if we haven't already set up the user (optimization/safeguard)
+            // simplified: just run once on mount if ID exists
+        }
+        if (existingSessionId) {
+            fetchSession();
+        }
+    }, [existingSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Create session in Supabase (Fixed: removed color column)
     const createSession = useCallback(async () => {
-        if (!userId) return null;
+        if (!userId || sessionId) return null; // Don't create if already exists
 
         try {
             const { data: session, error } = await supabase
@@ -97,8 +195,8 @@ export function useLudoGame(options: UseLudoGameOptions) {
                 session_id: session.id,
                 user_id: idx === 0 ? userId : null,
                 player_index: idx,
-                color: p.color,
                 is_ai: p.isAi,
+                name: p.name
             }));
 
             await supabase.from("ludo_players").insert(players);
@@ -119,9 +217,57 @@ export function useLudoGame(options: UseLudoGameOptions) {
             console.error("Error creating session:", error);
             return null;
         }
-    }, [userId, state.players, state.tokens, supabase]);
+    }, [userId, sessionId, state.players, state.tokens, supabase]);
 
-    // Persist move to Supabase
+    // Real-time synchronization
+    useEffect(() => {
+        if (!sessionId) return;
+
+        const channel = supabase.channel(`ludo_session_${sessionId}`)
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "ludo_moves", filter: `session_id=eq.${sessionId}` },
+                async (payload) => {
+                    // When a move happens, we can verify hydration, but simpler is to just apply the move locally
+                    // Or re-fetch. Ideally we treat ludo_moves as the event log.
+                    // For simplicity: refresh state on any move to ensure sync
+                    if (payload.eventType === "INSERT") {
+                        // We could optimize by applying the move locally if we trusted it,
+                        // but ensuring strict sync with DB is safer for now.
+                        // Actually, let's just re-fetch to be safe and simple.
+                        await fetchSession();
+                    }
+                }
+            )
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "ludo_sessions", filter: `id=eq.${sessionId}` },
+                (payload) => {
+                    setState(prev => ({
+                        ...prev,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        currentPlayerIndex: (payload.new as any).current_player_index,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        diceValue: (payload.new as any).dice_value,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        winner: (payload.new as any).winner_index
+                    }));
+                }
+            )
+            .on(
+                "postgres_changes",
+                { event: "INSERT", schema: "public", table: "ludo_players", filter: `session_id=eq.${sessionId}` },
+                () => fetchSession() // Reload players if someone joins
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [sessionId, supabase, fetchSession]);
+
+
+    // Persist move/roll to Supabase
     const persistMove = useCallback(
         async (
             playerIndex: number,
@@ -149,6 +295,14 @@ export function useLudoGame(options: UseLudoGameOptions) {
                     .eq("session_id", sessionId)
                     .eq("player_index", playerIndex)
                     .eq("token_index", tokenIndex);
+
+                // Update session (next player is handled by who invoked this, usually implicit in local state update)
+                // But we should update turn in DB
+                // Wait, local state update happens first. We need to push the NEW current player index
+                // We need to calculate it or grab it from the updated state.
+                // Actually, let's rely on the calling function to update session state if needed.
+                // But handleTokenMove updates local state.
+
             } catch (error) {
                 console.error("Error persisting move:", error);
             }
@@ -156,8 +310,45 @@ export function useLudoGame(options: UseLudoGameOptions) {
         [sessionId, supabase]
     );
 
+    const updateSessionState = useCallback(async (updates: { currentPlayerIndex?: number, diceValue?: number | null, winner?: number | null }) => {
+        if (!sessionId) return;
+        try {
+            const dbUpdates: Record<string, unknown> = {};
+            if (updates.currentPlayerIndex !== undefined) dbUpdates.current_player_index = updates.currentPlayerIndex;
+            if (updates.diceValue !== undefined) dbUpdates.dice_value = updates.diceValue;
+            if (updates.winner !== undefined) dbUpdates.winner_index = updates.winner;
+
+            const { error } = await supabase
+                .from("ludo_sessions")
+                .update(dbUpdates)
+                .eq("id", sessionId);
+
+            if (error) {
+                console.error("[LudoDebug] FAILED to update session state:", error);
+            } else {
+                console.log("[LudoDebug] Successfully updated session state. Updates:", updates);
+            }
+        } catch (err) {
+            console.error("Failed to update session state:", err);
+        }
+    }, [sessionId, supabase]);
+
+
     // Handle dice roll
     const handleRoll = useCallback(() => {
+        // Multiplayer check: Is it my turn?
+        if (isMultiplayer && sessionId) {
+            const currentPlayer = state.players[state.currentPlayerIndex];
+            console.log(`[LudoDebug] Turn Check: Me(${userId}) vs Current(${currentPlayer.id}) [${currentPlayer.name}]`);
+
+            // If I am strictly one user, I should only be able to move my own color
+            if (currentPlayer.id !== userId && !currentPlayer.isAi) {
+                console.log(`[LudoDebug] Blocked: Not my turn.`);
+                // addLog("Not your turn!"); // Removing toast to reduce noise, console is enough
+                return;
+            }
+        }
+
         if (isRolling || state.diceValue !== null || state.gameStatus === "finished") return;
 
         setIsRolling(true);
@@ -167,27 +358,45 @@ export function useLudoGame(options: UseLudoGameOptions) {
 
             const validMoves = getValidMoves(state, val);
 
-            setState((prev) => ({ ...prev, diceValue: val }));
+            setState((prev) => {
+                const next = { ...prev, diceValue: val };
+                // Sync dice value to DB
+                updateSessionState({ diceValue: val });
+                return next;
+            });
+
             addLog(`${state.players[state.currentPlayerIndex].name} rolled a ${val}`);
 
             if (validMoves.length === 0) {
                 addLog("No valid moves. Skipping turn.");
                 setTimeout(() => {
-                    setState((prev) => ({
-                        ...prev,
-                        currentPlayerIndex: (prev.currentPlayerIndex + 1) % 4,
-                        diceValue: null,
-                    }));
+                    setState((prev) => {
+                        const nextIndex = (prev.currentPlayerIndex + 1) % 4;
+                        updateSessionState({ currentPlayerIndex: nextIndex, diceValue: null });
+                        return {
+                            ...prev,
+                            currentPlayerIndex: nextIndex,
+                            diceValue: null,
+                        };
+                    });
                 }, 1000);
             } else {
                 setValidMoveTokenIds(validMoves);
             }
         }, 600);
-    }, [isRolling, state, addLog]);
+    }, [isRolling, state, addLog, isMultiplayer, sessionId, userId, updateSessionState]);
 
     // Handle token move
     const handleTokenMove = useCallback(
         (tokenId: number) => {
+            // Multiplayer check
+            if (isMultiplayer && sessionId) {
+                const currentPlayer = state.players[state.currentPlayerIndex];
+                if (currentPlayer.id !== userId && !currentPlayer.isAi) {
+                    return;
+                }
+            }
+
             if (state.diceValue === null) return;
 
             const token = state.tokens.find((t) => t.id === tokenId);
@@ -211,20 +420,45 @@ export function useLudoGame(options: UseLudoGameOptions) {
                 toPos
             );
 
+            // Sync session turn/winner
+            updateSessionState({
+                currentPlayerIndex: nextState.currentPlayerIndex,
+                diceValue: null,
+                winner: nextState.winner
+            });
+
             if (nextState.winner !== null) {
                 addLog(`GAME OVER! ${state.players[nextState.winner].name} WON!`);
                 onGameEnd?.(nextState.winner);
             }
         },
-        [state, addLog, persistMove, onGameEnd]
+        [state, addLog, persistMove, onGameEnd, isMultiplayer, sessionId, userId, updateSessionState]
     );
 
-    // AI Turn Logic
+    // AI Turn Logic - Only run AI if I am the host (Player 0) OR if it's single player
     useEffect(() => {
         if (state.gameStatus !== "playing" || state.winner !== null) return;
 
         const currentPlayer = state.players[state.currentPlayerIndex];
+
+        // Multiplayer AI rule: Only the "host" (User 1 / PlayerIndex 0) runs AI logic to avoid conflicting moves
+        // If it's single player (no session), we run it.
+        // If it's multiplayer, we only run if we are player 0.
+        // Wait, if we join a pvp game, player 0 is the host.
+        // What if player 0 is offline? Then game stuck.
+        // Ideally AI is server side, but here client-side.
+        // Ideally AI is server side, but here client-side.
+        // Let's say Player 0 (Blue) is responsible for AI turns.
+        // Let's say Player 0 (Blue) is responsible for AI turns.
+        // Check if I am Player 0 (either by explicit ID match or by 'p0' fallback if unhydrated)
+        const isHost = !isMultiplayer || (userId && (state.players[0].id === userId || state.players[0].id === 'p0'));
+
+        // Console debug for AI logic
         if (currentPlayer.isAi) {
+            console.log(`[LudoDebug] AI Turn: Index ${state.currentPlayerIndex}. IsHost? ${isHost} (Me: ${userId}, P0: ${state.players[0].id})`);
+        }
+
+        if (currentPlayer.isAi && isHost) {
             if (state.diceValue === null && !isRolling) {
                 aiTimeoutRef.current = setTimeout(handleRoll, 1500);
                 return () => {
@@ -240,14 +474,14 @@ export function useLudoGame(options: UseLudoGameOptions) {
                 };
             }
         }
-    }, [state, isRolling, validMoveTokenIds, handleRoll, handleTokenMove]);
+    }, [state, isRolling, validMoveTokenIds, handleRoll, handleTokenMove, isMultiplayer, userId]);
 
-    // Create session when game starts
+    // Create session when game starts (Single player only)
     useEffect(() => {
-        if (userId && !sessionId && state.gameStatus === "playing") {
+        if (userId && !sessionId && !existingSessionId && state.gameStatus === "playing" && !isMultiplayer) {
             createSession();
         }
-    }, [userId, sessionId, state.gameStatus, createSession]);
+    }, [userId, sessionId, state.gameStatus, createSession, existingSessionId, isMultiplayer]);
 
     // New game
     const newGame = useCallback(() => {
@@ -260,20 +494,22 @@ export function useLudoGame(options: UseLudoGameOptions) {
 
     // Get players with extended info
     const getPlayers = useCallback((): LudoPlayer[] => {
-        return state.players.map((p, idx) => ({
+        return state.players.map((p) => ({
             ...p,
-            userId: idx === 0 ? userId : undefined,
-            avatarUrl: idx === 0 ? userProfile?.avatar_url : undefined,
-            country: idx === 0 ? userProfile?.country : undefined,
+            userId: p.id.startsWith("p") ? undefined : p.id,
+            // If it's us, use our profile. If opponent, we hopefully fetched their name.
+            // Simplified:
+            avatarUrl: undefined, // TODO: Fetch opponent avatars
+            country: undefined,
         }));
-    }, [state.players, userId, userProfile]);
+    }, [state.players]);
 
     return {
         state,
         isRolling,
         validMoveTokenIds,
         logs,
-        isLoading: _isLoading,
+        isLoading,
         sessionId,
         handleRoll,
         handleTokenMove,

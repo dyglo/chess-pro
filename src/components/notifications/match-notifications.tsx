@@ -11,11 +11,20 @@ export function MatchNotifications() {
   const pathname = usePathname();
   const router = useRouter();
   const { pendingIncoming, activeMatches, activeLudoSessions, acceptRequest, declineRequest } = useMatchRequests();
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
-  const visibleRequests = useMemo(() => pendingIncoming.slice(0, 2), [pendingIncoming]);
-  const visibleChessMatches = useMemo(() => activeMatches.slice(0, 2), [activeMatches]);
-  const visibleLudoSessions = useMemo(() => activeLudoSessions.slice(0, 2), [activeLudoSessions]);
+  const visibleRequests = useMemo(() =>
+    pendingIncoming.filter(id => !dismissedIds.has(id.id)).slice(0, 2),
+    [pendingIncoming, dismissedIds]);
+
+  const visibleChessMatches = useMemo(() =>
+    activeMatches.filter(id => !dismissedIds.has(id.id)).slice(0, 2),
+    [activeMatches, dismissedIds]);
+
+  const visibleLudoSessions = useMemo(() =>
+    activeLudoSessions.filter(id => !dismissedIds.has(id.id)).slice(0, 2),
+    [activeLudoSessions, dismissedIds]);
 
   if (!user) return null;
   if (pathname === "/play") return null;
@@ -23,14 +32,31 @@ export function MatchNotifications() {
   if (pathname?.startsWith("/games/ludo")) return null;
   if (visibleRequests.length === 0 && visibleChessMatches.length === 0 && visibleLudoSessions.length === 0) return null;
 
+  const handleDismiss = (id: string) => {
+    setDismissedIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
   const handleAccept = async (requestId: string) => {
     if (pendingAction) return;
     setPendingAction(requestId);
+    console.log("Accepting request:", requestId);
     try {
       const result = await acceptRequest(requestId);
+      console.log("Accept result:", result);
+
       if (!result.error) {
-        if (result.gameType === "ludo" && result.sessionId) {
-          router.push(`/games/ludo?session=${result.sessionId}&multiplayer=true`);
+        if (result.gameType === "ludo") {
+          console.log("Redirecting to Ludo session:", result.sessionId);
+          if (result.sessionId) {
+            router.push(`/games/ludo?session=${result.sessionId}&multiplayer=true`);
+          } else {
+            console.error("Ludo game accepted but no sessionId returned");
+            alert("Error: Game created but session ID missing. Please check your active matches.");
+          }
         } else if (result.matchId) {
           router.push(`/match/${result.matchId}`);
         }
@@ -40,6 +66,7 @@ export function MatchNotifications() {
       }
     } catch (err) {
       console.error("Action failed:", err);
+      alert("An unexpected error occurred while accepting the request.");
     } finally {
       setPendingAction(null);
     }
@@ -67,8 +94,14 @@ export function MatchNotifications() {
         const gameType = req.game_type || "chess";
         const isPending = pendingAction === req.id;
         return (
-          <div key={req.id} className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-[var(--shadow)]">
-            <div className="flex items-center justify-between">
+          <div key={req.id} className="relative rounded-3xl border border-[var(--line)] bg-white p-4 shadow-[var(--shadow)]">
+            <button
+              onClick={() => handleDismiss(req.id)}
+              className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100 text-gray-400"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+            <div className="flex items-center justify-between pr-6">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 Match Request
               </p>
@@ -76,10 +109,12 @@ export function MatchNotifications() {
                 {gameType === 'ludo' ? '🎲 Ludo' : '♟ Chess'}
               </span>
             </div>
+            {/* ... rest of card ... */}
             <div className="mt-2 text-sm font-semibold">
               {req.requester?.full_name || req.requester?.username || "A player"} wants to play {gameType === 'ludo' ? 'Ludo' : 'Chess'}.
             </div>
             <div className="mt-3 flex gap-2">
+              {/* ... buttons ... */}
               <button
                 onClick={() => handleAccept(req.id)}
                 disabled={isPending}
@@ -101,8 +136,14 @@ export function MatchNotifications() {
 
       {/* Ready Chess Matches */}
       {visibleChessMatches.map((match) => (
-        <div key={match.id} className="rounded-3xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+        <div key={match.id} className="relative rounded-3xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+          <button
+            onClick={() => handleDismiss(match.id)}
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-blue-100 text-blue-400"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600 pr-6">
             Chess Match Ready
           </p>
           <div className="mt-2 text-sm font-semibold text-blue-900">
@@ -119,8 +160,14 @@ export function MatchNotifications() {
 
       {/* Ready Ludo Sessions */}
       {visibleLudoSessions.map((session) => (
-        <div key={session.id} className="rounded-3xl border border-purple-200 bg-purple-50 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-600">
+        <div key={session.id} className="relative rounded-3xl border border-purple-200 bg-purple-50 p-4 shadow-sm">
+          <button
+            onClick={() => handleDismiss(session.id)}
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-purple-100 text-purple-400"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-600 pr-6">
             Ludo Match Ready
           </p>
           <div className="mt-2 text-sm font-semibold text-purple-900">
@@ -129,8 +176,9 @@ export function MatchNotifications() {
           <Link
             href={`/games/ludo?session=${session.id}&multiplayer=true`}
             className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-purple-700 shadow-sm"
+            onClick={() => console.log("Joining Ludo session:", session.id)}
           >
-            Start Ludo
+            Start Ludo Match
           </Link>
         </div>
       ))}

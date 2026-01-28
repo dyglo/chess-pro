@@ -93,17 +93,20 @@ function LudoGameContent() {
 
     // Get display name for player
     const getPlayerName = (playerIndex: number) => {
-        if (playerIndex === 0) {
+        // In local/single player, Player 0 is always the current user
+        if (!isMultiplayer && playerIndex === 0) {
             return userProfile?.full_name || userProfile?.username || user?.email?.split("@")[0] || "Guest";
         }
+        // In multiplayer, respect the state hydrated from DB
         return state.players[playerIndex].name;
     };
 
     const players = state.players.map((p, idx) => ({
         ...p,
         name: getPlayerName(idx),
-        avatarUrl: idx === 0 && userProfile?.avatar_url ? userProfile.avatar_url : undefined,
-        country: idx === 0 && userProfile?.country ? userProfile.country : getAICountry(idx),
+        // Only override P0 avatar/country if single player. In multiplayer, use state.
+        avatarUrl: (!isMultiplayer && idx === 0) ? (userProfile?.avatar_url || undefined) : (p.avatarUrl || undefined),
+        country: (!isMultiplayer && idx === 0) ? (userProfile?.country || getAICountry(idx)) : (p.country || getAICountry(idx)),
     }));
 
     return (
@@ -177,7 +180,7 @@ function LudoGameContent() {
                                 isAi={players[0].isAi}
                                 color="blue"
                                 isActive={state.currentPlayerIndex === 0}
-                                avatarUrl={players[0].avatarUrl}
+                                avatarUrl={players[0].avatarUrl || undefined}
                                 country={players[0].country}
                             />
 
@@ -265,7 +268,7 @@ function LudoGameContent() {
                                     isAi={players[0].isAi}
                                     color="blue"
                                     isActive={state.currentPlayerIndex === 0}
-                                    avatarUrl={players[0].avatarUrl}
+                                    avatarUrl={players[0].avatarUrl || undefined}
                                     country={players[0].country}
                                     className="flex-1"
                                 />
@@ -280,16 +283,8 @@ function LudoGameContent() {
                             </div>
                         </div>
 
-                        {/* Right Sidebar - AI Players */}
+                        {/* Right Sidebar - Turn Indicator & Info */}
                         <div className="flex flex-col gap-3 h-full justify-center">
-                            {/* Red AI */}
-                            <LudoPlayerCard
-                                name={players[1].name}
-                                isAi={players[1].isAi}
-                                color="red"
-                                isActive={state.currentPlayerIndex === 1}
-                                country={players[1].country}
-                            />
 
                             {/* Turn Indicator */}
                             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -313,14 +308,6 @@ function LudoGameContent() {
                                 )}
                             </div>
 
-                            {/* Green AI */}
-                            <LudoPlayerCard
-                                name={players[2].name}
-                                isAi={players[2].isAi}
-                                color="green"
-                                isActive={state.currentPlayerIndex === 2}
-                                country={players[2].country}
-                            />
                         </div>
                     </div>
 
@@ -333,7 +320,7 @@ function LudoGameContent() {
                                 isAi={players[0].isAi}
                                 color="blue"
                                 isActive={state.currentPlayerIndex === 0}
-                                avatarUrl={players[0].avatarUrl}
+                                avatarUrl={players[0].avatarUrl || undefined}
                                 country={players[0].country}
                                 className="flex-1 scale-90 origin-left"
                             />

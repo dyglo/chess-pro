@@ -11,16 +11,31 @@ import { cn } from "@/lib/utils";
 export function NotificationCenter({ variant = "dark" }: { variant?: "light" | "dark" }) {
     const { user } = useAuth();
     const pathname = usePathname();
-    const { pendingIncoming, activeMatches, acceptRequest, declineRequest } = useMatchRequests();
+    const { pendingIncoming, activeMatches, activeLudoSessions, acceptRequest, declineRequest } = useMatchRequests();
     const [isOpen, setIsOpen] = useState(false);
+    const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
     if (!user) return null;
 
     const isLight = variant === "light";
-    const currentMatchId = pathname?.startsWith("/match/") ? pathname.split("/")[2] : null;
-    const filteredMatches = activeMatches.filter(m => m.id !== currentMatchId);
+    const currentMatchId = pathname?.startsWith("/match/") ? pathname.split("/")[2] : null; // Matches
+    const currentSessionId = pathname?.startsWith("/games/ludo") && pathname.includes("session=") ? pathname.split("session=")[1]?.split("&")[0] : null;
 
-    const totalCount = pendingIncoming.length + filteredMatches.length;
+    const filteredMatches = activeMatches.filter(m => m.id !== currentMatchId && !dismissedIds.has(m.id));
+    const filteredLudo = activeLudoSessions.filter(s => s.id !== currentSessionId && !dismissedIds.has(s.id));
+    const filteredRequests = pendingIncoming.filter(r => !dismissedIds.has(r.id));
+
+    const totalCount = filteredRequests.length + filteredMatches.length + filteredLudo.length;
+
+    const handleDismiss = (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDismissedIds(prev => {
+            const next = new Set(prev);
+            next.add(id);
+            return next;
+        });
+    };
 
     return (
         <div className="relative">
@@ -79,11 +94,20 @@ export function NotificationCenter({ variant = "dark" }: { variant?: "light" | "
                                 </div>
                             )}
 
-                            {pendingIncoming.map((req) => (
+                            {filteredRequests.map((req) => (
                                 <div key={req.id} className={cn(
-                                    "rounded-2xl border p-3",
+                                    "relative rounded-2xl border p-3",
                                     isLight ? "bg-zinc-50 border-zinc-100" : "bg-white/5 border-white/5"
                                 )}>
+                                    <button
+                                        onClick={(e) => handleDismiss(e, req.id)}
+                                        className={cn(
+                                            "absolute top-2 right-2 p-1 rounded-full hover:bg-black/5 transition-colors",
+                                            isLight ? "text-zinc-400" : "text-white/40"
+                                        )}
+                                    >
+                                        <X size={12} />
+                                    </button>
                                     <p className={cn(
                                         "text-[10px] font-semibold uppercase tracking-widest",
                                         isLight ? "text-zinc-400" : "text-white/40"
@@ -121,9 +145,18 @@ export function NotificationCenter({ variant = "dark" }: { variant?: "light" | "
 
                             {filteredMatches.map((match) => (
                                 <div key={match.id} className={cn(
-                                    "rounded-2xl border p-3",
+                                    "relative rounded-2xl border p-3",
                                     isLight ? "bg-red-50/50 border-red-100" : "bg-white/5 border-white/5"
                                 )}>
+                                    <button
+                                        onClick={(e) => handleDismiss(e, match.id)}
+                                        className={cn(
+                                            "absolute top-2 right-2 p-1 rounded-full hover:bg-black/5 transition-colors",
+                                            isLight ? "text-red-300 hover:text-red-500" : "text-white/40"
+                                        )}
+                                    >
+                                        <X size={12} />
+                                    </button>
                                     <p className="text-[10px] font-semibold uppercase tracking-widest text-[#ef4444]">
                                         Match Ready
                                     </p>
@@ -131,7 +164,7 @@ export function NotificationCenter({ variant = "dark" }: { variant?: "light" | "
                                         "mt-1 text-sm font-medium",
                                         isLight ? "text-zinc-900" : "text-white"
                                     )}>
-                                        Your match is live. Join now to play.
+                                        Your chess match is live.
                                     </p>
                                     <Link
                                         href={`/match/${match.id}`}
@@ -139,6 +172,39 @@ export function NotificationCenter({ variant = "dark" }: { variant?: "light" | "
                                         className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-[#ef4444] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110"
                                     >
                                         Open Match
+                                    </Link>
+                                </div>
+                            ))}
+
+                            {filteredLudo.map((session) => (
+                                <div key={session.id} className={cn(
+                                    "relative rounded-2xl border p-3",
+                                    isLight ? "bg-purple-50/50 border-purple-100" : "bg-white/5 border-white/5"
+                                )}>
+                                    <button
+                                        onClick={(e) => handleDismiss(e, session.id)}
+                                        className={cn(
+                                            "absolute top-2 right-2 p-1 rounded-full hover:bg-black/5 transition-colors",
+                                            isLight ? "text-purple-300 hover:text-purple-500" : "text-white/40"
+                                        )}
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-purple-600">
+                                        Ludo Ready
+                                    </p>
+                                    <p className={cn(
+                                        "mt-1 text-sm font-medium",
+                                        isLight ? "text-zinc-900" : "text-white"
+                                    )}>
+                                        Ludo match is live!
+                                    </p>
+                                    <Link
+                                        href={`/games/ludo?session=${session.id}&multiplayer=true`}
+                                        onClick={() => setIsOpen(false)}
+                                        className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110"
+                                    >
+                                        Play Ludo
                                     </Link>
                                 </div>
                             ))}
