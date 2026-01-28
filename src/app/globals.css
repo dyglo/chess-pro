@@ -67,6 +67,12 @@ a {
   100% { opacity: 0; transform: scale(1.3); }
 }
 
+@keyframes ludoConfettiFall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(220px) rotate(260deg); opacity: 0; }
+}
+
 .ludo-knock-flash {
   animation: ludoKnockFlash 280ms ease-out;
   transform-origin: center;
@@ -82,10 +88,60 @@ a {
   transform-origin: center;
 }
 
+.ludo-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ludo-confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: ludoConfettiFall 2.4s ease-in-out infinite;
+}
+
+.ludo-confetti-piece:nth-child(1) { left: 10%; background: #f97316; animation-delay: 0s; }
+.ludo-confetti-piece:nth-child(2) { left: 18%; background: #22c55e; animation-delay: 0.2s; }
+.ludo-confetti-piece:nth-child(3) { left: 26%; background: #3b82f6; animation-delay: 0.35s; }
+.ludo-confetti-piece:nth-child(4) { left: 34%; background: #eab308; animation-delay: 0.1s; }
+.ludo-confetti-piece:nth-child(5) { left: 42%; background: #ef4444; animation-delay: 0.3s; }
+.ludo-confetti-piece:nth-child(6) { left: 50%; background: #a855f7; animation-delay: 0.15s; }
+.ludo-confetti-piece:nth-child(7) { left: 58%; background: #14b8a6; animation-delay: 0.25s; }
+.ludo-confetti-piece:nth-child(8) { left: 66%; background: #f59e0b; animation-delay: 0.4s; }
+.ludo-confetti-piece:nth-child(9) { left: 74%; background: #10b981; animation-delay: 0.05s; }
+.ludo-confetti-piece:nth-child(10) { left: 82%; background: #60a5fa; animation-delay: 0.3s; }
+.ludo-confetti-piece:nth-child(11) { left: 14%; background: #f43f5e; animation-delay: 0.45s; }
+.ludo-confetti-piece:nth-child(12) { left: 22%; background: #84cc16; animation-delay: 0.55s; }
+.ludo-confetti-piece:nth-child(13) { left: 46%; background: #f97316; animation-delay: 0.6s; }
+.ludo-confetti-piece:nth-child(14) { left: 62%; background: #38bdf8; animation-delay: 0.5s; }
+.ludo-confetti-piece:nth-child(15) { left: 70%; background: #fb7185; animation-delay: 0.35s; }
+.ludo-confetti-piece:nth-child(16) { left: 90%; background: #4ade80; animation-delay: 0.2s; }
+
+.ludo-finish-logo {
+  transform-origin: center;
+  animation: ludoFinishPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ludoFinishPulse {
+  0% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.85; }
+}
+
+.ludo-out-marker text {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ludo-knock-flash,
   .ludo-capture-ring,
-  .ludo-capture-burst {
+  .ludo-capture-burst,
+  .ludo-confetti-piece,
+  .ludo-finish-logo {
     animation: none;
   }
 }

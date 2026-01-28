@@ -108,6 +108,28 @@ export default function FriendsPage() {
     return activeMatches.filter((match) => matchParticipation[match.id] === "left");
   }, [activeMatches, matchParticipation]);
 
+  const primaryLiveNotice = useMemo(() => {
+    if (matchStartedNotifs.length > 0) {
+      const notif = matchStartedNotifs[0];
+      return {
+        id: notif.id,
+        label: notif.message || "A match is live. Join to start playing.",
+        payload: notif.payload,
+        type: "started" as const,
+      };
+    }
+    if (leftActiveMatches.length > 0) {
+      const match = leftActiveMatches[0];
+      return {
+        id: match.id,
+        label: match.game_type === "ludo" ? "Your Ludo match is live." : "Your chess match is live.",
+        match,
+        type: "resume" as const,
+      };
+    }
+    return null;
+  }, [matchStartedNotifs, leftActiveMatches]);
+
   const handleJoinStartedMatch = async (notifId: string, payload: Record<string, unknown>) => {
     const matchId = payload.matchId as string | undefined;
     const gameType = (payload.gameType as GameType | undefined) ?? "ludo";
@@ -198,6 +220,40 @@ export default function FriendsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
+        {primaryLiveNotice && (
+          <div className="mb-5 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 shadow-[var(--shadow-sm)] backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs font-semibold text-[var(--muted)]">
+                Live Match
+              </div>
+              <div className="flex-1 text-sm font-semibold text-[var(--foreground)]">
+                {primaryLiveNotice.label}
+              </div>
+              {primaryLiveNotice.type === "started" ? (
+                <button
+                  onClick={() => handleJoinStartedMatch(primaryLiveNotice.id, primaryLiveNotice.payload)}
+                  className="rounded-full bg-[var(--accent)] px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:brightness-110"
+                >
+                  Join
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    const match = primaryLiveNotice.match;
+                    if (match.game_type === "ludo") {
+                      router.push(`/games/ludo?match=${match.id}&multiplayer=true`);
+                    } else {
+                      router.push(`/match/${match.id}`);
+                    }
+                  }}
+                  className="rounded-full bg-[var(--accent)] px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:brightness-110"
+                >
+                  Resume
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {matchStartedNotifs.length > 0 && (
           <div className="mb-6 space-y-3">
             {matchStartedNotifs.map((notif) => (

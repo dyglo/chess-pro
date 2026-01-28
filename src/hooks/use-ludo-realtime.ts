@@ -155,6 +155,7 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
                             const globalPos = (toPos + startOffsets[seat]) % 52;
                             setCaptureEffect({ globalPos, color: PLAYER_COLORS[seat] });
                         }
+                        addLog(`Captured ${knocked.length} token${knocked.length === 1 ? "" : "s"}.`);
                         setKnockedTokenIds(knocked.map((k) => k.tokenId).filter((id): id is number => typeof id === "number"));
                         if (captureTimeoutRef.current) {
                             window.clearTimeout(captureTimeoutRef.current);

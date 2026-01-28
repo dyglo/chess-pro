@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { LudoBoard } from "./components/LudoBoard";
@@ -12,10 +12,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { UserDropdown } from "@/components/play/user-dropdown";
 import { ProfileSettingsModal } from "@/components/play/profile-settings-modal";
 import { cn } from "@/lib/utils";
-import { Plus, Settings, HelpCircle, Menu, X, Users } from "lucide-react";
+import { Plus, Settings, HelpCircle, Menu, X, Users, History } from "lucide-react";
 import { LudoSettingsModal } from "@/components/play/ludo-settings-modal";
 import { defaultLudoStyle, getLudoStyleById } from "@/lib/ludo/board-styles";
 import { LudoThemeToggle } from "./components/theme-toggle";
+import { FINISH_POS } from "@/lib/ludo/ludo-state";
 
 export default function LudoPage() {
     return (
@@ -47,6 +48,7 @@ function LudoGameContent() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [boardStyleId, setBoardStyleId] = useState(defaultLudoStyle.id);
     const [isDarkMode, setIsDarkMode] = useState(false);
+    const [showTimeline, setShowTimeline] = useState(false);
 
     useEffect(() => {
         const savedStyle = localStorage.getItem("ludo-board-style");
@@ -131,6 +133,7 @@ function LudoGameContent() {
         state,
         isRolling,
         validMoveTokenIds,
+        logs,
         handleRoll,
         handleTokenMove,
         newGame,
@@ -163,6 +166,8 @@ function LudoGameContent() {
             isAi: false,
             avatarUrl: undefined as string | undefined,
             country: getAICountry(idx),
+            userId: undefined as string | undefined,
+            status: "joined" as string,
         };
         if (roster) {
             return {
@@ -171,10 +176,41 @@ function LudoGameContent() {
                 isAi: roster.isAi,
                 avatarUrl: roster.avatarUrl || undefined,
                 country: roster.country || getAICountry(idx),
+                userId: roster.userId,
+                status: roster.status,
             };
         }
-        return players[idx] ?? fallback;
+        return {
+            ...(players[idx] ?? fallback),
+            userId: !isMultiplayer && idx === 0 ? user?.id : undefined,
+            status: players[idx]?.isAi ? "ai" : "joined",
+        };
     });
+
+    const finishedByColor = useMemo(() => {
+        const counts: Record<"blue" | "red" | "green" | "yellow", number> = {
+            blue: 0,
+            red: 0,
+            green: 0,
+            yellow: 0,
+        };
+        state.tokens.forEach((t) => {
+            if (t.position >= FINISH_POS) {
+                counts[t.color] += 1;
+            }
+        });
+        return counts;
+    }, [state.tokens]);
+
+    const isWinnerMe = useMemo(() => {
+        if (state.winner === null) return false;
+        if (!isMultiplayer) return state.winner === 0;
+        const winnerUserId = normalizedPlayers[state.winner]?.userId;
+        return !!winnerUserId && winnerUserId === user?.id;
+    }, [state.winner, isMultiplayer, normalizedPlayers, user?.id]);
+
+    const lastLog = logs?.[0] ?? "No moves yet.";
+    const timelineLogs = (logs ?? []).slice(0, 4);
 
     return (
         <div className={cn(
@@ -252,6 +288,8 @@ function LudoGameContent() {
                                 isActive={state.currentPlayerIndex === 0}
                                 avatarUrl={normalizedPlayers[0].avatarUrl || undefined}
                                 country={normalizedPlayers[0].country}
+                                finishedCount={finishedByColor.blue}
+                                status={normalizedPlayers[0].status}
                             />
 
                             {/* Action Panel with Dice */}
@@ -264,6 +302,28 @@ function LudoGameContent() {
                                         onRoll={handleRoll}
                                         disabled={isRolling || state.diceValue !== null || isCurrentPlayerAi || state.gameStatus === 'finished'}
                                     />
+                                </div>
+                                <div className="pt-2">
+                                    <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--ludo-text-muted)]">
+                                        <span className="truncate">Last: {lastLog}</span>
+                                        <button
+                                            type="button"
+                                            aria-label="Toggle timeline"
+                                            onClick={() => setShowTimeline((prev) => !prev)}
+                                            className="p-1 rounded-md hover:bg-[var(--ludo-border-card)] transition-colors"
+                                        >
+                                            <History className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                    {showTimeline && (
+                                        <div className="mt-2 space-y-1">
+                                            {timelineLogs.map((log, i) => (
+                                                <div key={`${log}-${i}`} className="text-[11px] text-[var(--ludo-text-secondary)] truncate">
+                                                    {log}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Actions */}
@@ -301,6 +361,8 @@ function LudoGameContent() {
                                 color="yellow"
                                 isActive={state.currentPlayerIndex === 3}
                                 country={normalizedPlayers[3].country}
+                                finishedCount={finishedByColor.yellow}
+                                status={normalizedPlayers[3].status}
                             />
                         </div>
 
@@ -314,6 +376,8 @@ function LudoGameContent() {
                                     color="red"
                                     isActive={state.currentPlayerIndex === 1}
                                     country={normalizedPlayers[1].country}
+                                    finishedCount={finishedByColor.red}
+                                    status={normalizedPlayers[1].status}
                                     className="flex-1"
                                 />
                                 <LudoPlayerCard
@@ -322,6 +386,8 @@ function LudoGameContent() {
                                     color="green"
                                     isActive={state.currentPlayerIndex === 2}
                                     country={normalizedPlayers[2].country}
+                                    finishedCount={finishedByColor.green}
+                                    status={normalizedPlayers[2].status}
                                     className="flex-1"
                                 />
                             </div>
@@ -335,6 +401,7 @@ function LudoGameContent() {
                                     style={boardStyle}
                                     captureEffect={captureEffect}
                                     knockedTokenIds={knockedTokenIds}
+                                    finishedByColor={finishedByColor}
                                 />
                             </div>
 
@@ -347,6 +414,8 @@ function LudoGameContent() {
                                     isActive={state.currentPlayerIndex === 0}
                                     avatarUrl={normalizedPlayers[0].avatarUrl || undefined}
                                     country={normalizedPlayers[0].country}
+                                    finishedCount={finishedByColor.blue}
+                                    status={normalizedPlayers[0].status}
                                     className="flex-1"
                                 />
                                 <LudoPlayerCard
@@ -355,6 +424,8 @@ function LudoGameContent() {
                                     color="yellow"
                                     isActive={state.currentPlayerIndex === 3}
                                     country={normalizedPlayers[3].country}
+                                    finishedCount={finishedByColor.yellow}
+                                    status={normalizedPlayers[3].status}
                                     className="flex-1"
                                 />
                             </div>
@@ -399,6 +470,8 @@ function LudoGameContent() {
                                 isActive={state.currentPlayerIndex === 0}
                                 avatarUrl={normalizedPlayers[0].avatarUrl || undefined}
                                 country={normalizedPlayers[0].country}
+                                finishedCount={finishedByColor.blue}
+                                status={normalizedPlayers[0].status}
                                 className="flex-1 scale-90 origin-left"
                             />
                             <LudoPlayerCard
@@ -407,6 +480,8 @@ function LudoGameContent() {
                                 color="red"
                                 isActive={state.currentPlayerIndex === 1}
                                 country={normalizedPlayers[1].country}
+                                finishedCount={finishedByColor.red}
+                                status={normalizedPlayers[1].status}
                                 className="flex-1 scale-90 origin-right"
                             />
                         </div>
@@ -420,6 +495,7 @@ function LudoGameContent() {
                                 style={boardStyle}
                                 captureEffect={captureEffect}
                                 knockedTokenIds={knockedTokenIds}
+                                finishedByColor={finishedByColor}
                             />
                         </div>
 
@@ -431,7 +507,27 @@ function LudoGameContent() {
                                 onRoll={handleRoll}
                                 disabled={isRolling || state.diceValue !== null || isCurrentPlayerAi || state.gameStatus === 'finished'}
                             />
+                            <button
+                                type="button"
+                                aria-label="Toggle timeline"
+                                onClick={() => setShowTimeline((prev) => !prev)}
+                                className="p-2 rounded-md hover:bg-[var(--ludo-border-card)] transition-colors"
+                            >
+                                <History className="w-4 h-4 text-[var(--ludo-text-muted)]" />
+                            </button>
                         </div>
+                        {showTimeline && (
+                            <div className="w-full px-4">
+                                <div className="text-[11px] text-[var(--ludo-text-muted)] mb-1">Last: {lastLog}</div>
+                                <div className="space-y-1">
+                                    {timelineLogs.map((log, i) => (
+                                        <div key={`${log}-${i}`} className="text-[11px] text-[var(--ludo-text-secondary)] truncate">
+                                            {log}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Bottom Players */}
                         <div className="w-full flex justify-between gap-2 px-2">
@@ -441,6 +537,8 @@ function LudoGameContent() {
                                 color="yellow"
                                 isActive={state.currentPlayerIndex === 3}
                                 country={normalizedPlayers[3].country}
+                                finishedCount={finishedByColor.yellow}
+                                status={normalizedPlayers[3].status}
                                 className="flex-1 scale-90 origin-left"
                             />
                             <LudoPlayerCard
@@ -449,6 +547,8 @@ function LudoGameContent() {
                                 color="green"
                                 isActive={state.currentPlayerIndex === 2}
                                 country={normalizedPlayers[2].country}
+                                finishedCount={finishedByColor.green}
+                                status={normalizedPlayers[2].status}
                                 className="flex-1 scale-90 origin-right"
                             />
                         </div>
@@ -459,8 +559,15 @@ function LudoGameContent() {
             {/* Game Over Overlay */}
             {state.winner !== null && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
-                        <h2 className="text-3xl font-black mb-2">Game Over!</h2>
+                    <div className="relative overflow-hidden bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
+                        {isWinnerMe && (
+                            <div className="ludo-confetti" aria-hidden="true">
+                                {Array.from({ length: 16 }).map((_, i) => (
+                                    <span key={i} className="ludo-confetti-piece" />
+                                ))}
+                            </div>
+                        )}
+                        <h2 className="text-3xl font-black mb-2">{isWinnerMe ? "YOU WON!" : "Game Over!"}</h2>
                         <p className="text-lg text-gray-600 mb-6">
                             {normalizedPlayers[state.winner]?.name || "Player"} wins!
                         </p>

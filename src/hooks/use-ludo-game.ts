@@ -406,10 +406,21 @@ export function useLudoGame(options: UseLudoGameOptions) {
             const nextState = moveToken(state, tokenId, state.diceValue);
             const movedToken = nextState.tokens.find((t) => t.id === tokenId);
             const toPos = movedToken?.position ?? fromPos;
+            const prevTokenMap = new Map(state.tokens.map((t) => [t.id, t]));
+            const knockedCount = nextState.tokens.filter((t) => {
+                const prev = prevTokenMap.get(t.id);
+                return prev
+                    && prev.playerIndex !== token.playerIndex
+                    && prev.position >= 0
+                    && t.position === -1;
+            }).length;
 
             setState(nextState);
             setValidMoveTokenIds([]);
             addLog(`Moved token.`);
+            if (knockedCount > 0) {
+                addLog(`Captured ${knockedCount} token${knockedCount === 1 ? "" : "s"}.`);
+            }
 
             // Persist to Supabase
             persistMove(

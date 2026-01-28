@@ -14,6 +14,8 @@ interface LudoPlayerCardProps {
     country?: string;
     avatarUrl?: string;
     userId?: string;
+    finishedCount?: number;
+    status?: string;
     className?: string;
 }
 
@@ -24,6 +26,8 @@ export function LudoPlayerCard({
     isActive,
     country = "Global",
     avatarUrl,
+    finishedCount = 0,
+    status,
     className,
 }: LudoPlayerCardProps) {
     const colorClasses = {
@@ -58,14 +62,28 @@ export function LudoPlayerCard({
     };
 
     const colors = colorClasses[color];
+    const statusLabel = isAi
+        ? "AI"
+        : status === "pending"
+            ? "Pending"
+            : status === "left"
+                ? "Left"
+                : "Online";
+    const statusStyles = isAi
+        ? "bg-indigo-100 text-indigo-700"
+        : status === "pending"
+            ? "bg-amber-100 text-amber-700"
+            : status === "left"
+                ? "bg-gray-200 text-gray-600"
+                : "bg-emerald-100 text-emerald-700";
 
     return (
         <div
             className={cn(
                 "relative flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
                 isActive
-                    ? cn("bg-white shadow-lg border-transparent ring-2", colors.ring)
-                    : cn("bg-gray-50/50 border-gray-100 opacity-60"),
+                    ? cn("bg-[var(--ludo-bg-card-active)] shadow-lg border-transparent ring-2", colors.ring)
+                    : cn("bg-[var(--ludo-bg-card)] border-[var(--ludo-border-card)] opacity-60"),
                 className
             )}
         >
@@ -73,8 +91,8 @@ export function LudoPlayerCard({
             <div className="relative flex-shrink-0">
                 <div className={cn(
                     "w-10 h-10 rounded-full overflow-hidden border-2 flex items-center justify-center",
-                    isActive ? "border-gray-200" : "border-gray-100",
-                    !avatarUrl && "bg-gray-100"
+                    isActive ? "border-[var(--ludo-border-card)]" : "border-[var(--ludo-border-card)]",
+                    !avatarUrl && "bg-[var(--ludo-border-card)]"
                 )}>
                     {avatarUrl ? (
                         <Image
@@ -109,13 +127,19 @@ export function LudoPlayerCard({
                 <div className="flex items-center gap-2">
                     <span className={cn(
                         "text-sm font-bold truncate",
-                        isActive ? "text-gray-900" : "text-gray-500"
+                        isActive ? "text-[var(--ludo-text-primary)]" : "text-[var(--ludo-text-secondary)]"
                     )}>
                         {name}
                     </span>
                     {isActive && (
                         <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                     )}
+                    <span className={cn(
+                        "px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide",
+                        statusStyles
+                    )}>
+                        {statusLabel}
+                    </span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                     <span className={cn(
@@ -125,11 +149,16 @@ export function LudoPlayerCard({
                         {color}
                     </span>
                     {country && (
-                        <span className="text-[10px] text-gray-400 font-medium">
+                        <span className="text-[10px] text-[var(--ludo-text-muted)] font-medium">
                             {country}
                         </span>
                     )}
                 </div>
+                {finishedCount > 0 && (
+                    <div className="text-[10px] text-[var(--ludo-text-muted)] font-semibold mt-1">
+                        Out: {finishedCount}/4 waiting
+                    </div>
+                )}
             </div>
 
             {/* Thinking Indicator for AI */}

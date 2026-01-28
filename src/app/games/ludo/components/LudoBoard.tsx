@@ -13,6 +13,7 @@ interface LudoBoardProps {
     style?: LudoBoardStyle;
     captureEffect?: { globalPos: number; color: PlayerColor } | null;
     knockedTokenIds?: number[];
+    finishedByColor?: Partial<Record<PlayerColor, number>>;
 }
 
 export function LudoBoard({
@@ -23,6 +24,7 @@ export function LudoBoard({
     style = defaultLudoStyle,
     captureEffect = null,
     knockedTokenIds = [],
+    finishedByColor = {},
 }: LudoBoardProps) {
     const BOARD_SIZE = 450;
     const CELL_SIZE = BOARD_SIZE / 15;
@@ -142,6 +144,20 @@ export function LudoBoard({
                 <polygon points={`${CELL_SIZE * 9},${CELL_SIZE * 6} ${CELL_SIZE * 9},${CELL_SIZE * 9} ${BOARD_SIZE / 2},${BOARD_SIZE / 2}`} fill="url(#grad-yellow)" />
                 <polygon points={`${CELL_SIZE * 9},${CELL_SIZE * 9} ${CELL_SIZE * 6},${CELL_SIZE * 9} ${BOARD_SIZE / 2},${BOARD_SIZE / 2}`} fill="url(#grad-blue)" />
                 <polygon points={`${CELL_SIZE * 6},${CELL_SIZE * 9} ${CELL_SIZE * 6},${CELL_SIZE * 6} ${BOARD_SIZE / 2},${BOARD_SIZE / 2}`} fill="url(#grad-red)" />
+                <g className="ludo-finish-logo">
+                    <circle cx={BOARD_SIZE / 2} cy={BOARD_SIZE / 2} r={CELL_SIZE * 0.85} fill={style.background} stroke={style.gridStroke} strokeWidth="1" />
+                    <path
+                        d={`M ${BOARD_SIZE / 2 - CELL_SIZE * 0.45} ${BOARD_SIZE / 2 + CELL_SIZE * 0.2}
+                            L ${BOARD_SIZE / 2 - CELL_SIZE * 0.25} ${BOARD_SIZE / 2 - CELL_SIZE * 0.2}
+                            L ${BOARD_SIZE / 2} ${BOARD_SIZE / 2 + CELL_SIZE * 0.05}
+                            L ${BOARD_SIZE / 2 + CELL_SIZE * 0.25} ${BOARD_SIZE / 2 - CELL_SIZE * 0.2}
+                            L ${BOARD_SIZE / 2 + CELL_SIZE * 0.45} ${BOARD_SIZE / 2 + CELL_SIZE * 0.2}
+                            Z`}
+                        fill={style.safeSquareColor}
+                        opacity={0.85}
+                    />
+                    <circle cx={BOARD_SIZE / 2} cy={BOARD_SIZE / 2 - CELL_SIZE * 0.25} r={CELL_SIZE * 0.08} fill={style.safeSquareColor} opacity={0.9} />
+                </g>
                 {Array.from({ length: 15 }).map((_, i) => Array.from({ length: 15 }).map((_, j) => {
                     const isMiddle = (i >= 6 && i <= 8) || (j >= 6 && j <= 8);
                     if (!isMiddle || (i >= 6 && i <= 8 && j >= 6 && j <= 8)) return null;
@@ -174,6 +190,28 @@ export function LudoBoard({
                     })()
                 )}
                 {tokens.map(renderToken)}
+                {(["blue", "red", "green", "yellow"] as PlayerColor[]).map((color) => {
+                    const count = finishedByColor[color] ?? 0;
+                    if (count <= 0) return null;
+                    const [bx, by] = getBaseCoords(color, 0);
+                    const centerX = bx * CELL_SIZE + CELL_SIZE / 2;
+                    const centerY = by * CELL_SIZE + CELL_SIZE / 2;
+                    return (
+                        <g key={`out-${color}`} className="ludo-out-marker">
+                            <rect x={centerX - CELL_SIZE * 0.55} y={centerY + CELL_SIZE * 0.75} width={CELL_SIZE * 1.1} height={CELL_SIZE * 0.5} rx="6" fill={style.background} opacity={0.9} />
+                            <text
+                                x={centerX}
+                                y={centerY + CELL_SIZE * 1.08}
+                                textAnchor="middle"
+                                fontSize={CELL_SIZE * 0.3}
+                                fill={style.trackColors[color]}
+                                fontWeight="700"
+                            >
+                                Out {count}
+                            </text>
+                        </g>
+                    );
+                })}
             </svg>
         </div>
     );
