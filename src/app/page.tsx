@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/header";
-import { MessageSquare, Puzzle, Trophy, Users, ShieldCheck, Sparkles } from "lucide-react";
+import { MessageSquare, Puzzle, Trophy, Users, Sparkles } from "lucide-react";
 
 export default function Home() {
   return (

@@ -11,6 +11,8 @@ export interface ProfileLite {
   avatar_url?: string | null;
 }
 
+export type GameType = "chess" | "ludo";
+
 export interface FriendRequest {
   id: string;
   requester_id: string;
@@ -19,6 +21,7 @@ export interface FriendRequest {
   created_at: string;
   responded_at?: string | null;
   match_id?: string | null;
+  game_type?: GameType; // Optional, defaults to 'chess' for backward compatibility
   requester?: ProfileLite | null;
   recipient?: ProfileLite | null;
 }
@@ -140,13 +143,14 @@ export function useMatchRequests() {
   }, [user, refresh]);
 
   const sendRequest = useCallback(
-    async (recipientId: string) => {
+    async (recipientId: string, gameType: GameType = "chess") => {
       if (!user) return { error: "Not authenticated" };
       const supabase = createClient();
       const { error: insertError } = await supabase.from("friend_requests").insert({
         requester_id: user.id,
         recipient_id: recipientId,
         status: "pending",
+        game_type: gameType,
       });
       if (insertError) return { error: insertError.message };
       await refresh();
@@ -157,14 +161,37 @@ export function useMatchRequests() {
 
   const acceptRequest = useCallback(
     async (requestId: string) => {
-      if (!user) return { error: "Not authenticated" };
+      if (!user) return { error: "Not authenticated", matchId: null as string | null, sessionId: null as string | null, gameType: "chess" as GameType };
+
+      // First, get the request to check game_type
       const supabase = createClient();
-      const { data, error: rpcError } = await supabase.rpc("accept_match_request", {
-        request_id: requestId,
-      });
-      if (rpcError) return { error: rpcError.message, matchId: null as string | null };
-      await refresh();
-      return { error: null, matchId: data as string };
+      const { data: reqData, error: reqError } = await supabase
+        .from("friend_requests")
+        .select("game_type")
+        .eq("id", requestId)
+        .single();
+
+      if (reqError) return { error: reqError.message, matchId: null, sessionId: null, gameType: "chess" as GameType };
+
+      const gameType = (reqData?.game_type as GameType) || "chess";
+
+      if (gameType === "ludo") {
+        // Call Ludo-specific RPC
+        const { data, error: rpcError } = await supabase.rpc("accept_ludo_match_request", {
+          request_id: requestId,
+        });
+        if (rpcError) return { error: rpcError.message, matchId: null, sessionId: null, gameType };
+        await refresh();
+        return { error: null, matchId: null, sessionId: data as string, gameType };
+      } else {
+        // Call Chess RPC (existing logic)
+        const { data, error: rpcError } = await supabase.rpc("accept_match_request", {
+          request_id: requestId,
+        });
+        if (rpcError) return { error: rpcError.message, matchId: null, sessionId: null, gameType };
+        await refresh();
+        return { error: null, matchId: data as string, sessionId: null, gameType };
+      }
     },
     [user, refresh]
   );

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useMatchRequests } from "@/hooks/use-match-requests";
+import { useMatchRequests, GameType } from "@/hooks/use-match-requests";
 import { AuthHeaderActions } from "@/components/auth/auth-header-actions";
 
 type ProfileLite = {
@@ -33,6 +33,7 @@ export default function FriendsPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedGame, setSelectedGame] = useState<Record<string, GameType>>({});
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -165,6 +166,7 @@ export default function FriendsPage() {
                   {filteredProfiles.map((profile) => {
                     const isPending = pendingOutgoing.some((req) => req.recipient_id === profile.id);
                     const isOnline = presence[profile.id]?.is_online ?? false;
+                    const gameChoice = selectedGame[profile.id] || "chess";
 
                     return (
                       <div key={profile.id} className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
@@ -186,16 +188,28 @@ export default function FriendsPage() {
                             </p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => sendRequest(profile.id)}
-                          disabled={isPending}
-                          className={`rounded-full px-4 py-2 text-xs font-semibold transition ${isPending
+                        <div className="flex items-center gap-2">
+                          {/* Game Selector */}
+                          <select
+                            value={gameChoice}
+                            onChange={(e) => setSelectedGame(prev => ({ ...prev, [profile.id]: e.target.value as GameType }))}
+                            disabled={isPending}
+                            className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:opacity-50"
+                          >
+                            <option value="chess">♟ Chess</option>
+                            <option value="ludo">🎲 Ludo</option>
+                          </select>
+                          <button
+                            onClick={() => sendRequest(profile.id, gameChoice)}
+                            disabled={isPending}
+                            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${isPending
                               ? "cursor-not-allowed bg-white text-[var(--muted)]"
                               : "bg-[var(--accent)] text-white hover:opacity-90"
-                            }`}
-                        >
-                          {isPending ? "Requested" : "Send Match Request"}
-                        </button>
+                              }`}
+                          >
+                            {isPending ? "Requested" : "Send Request"}
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -214,27 +228,45 @@ export default function FriendsPage() {
             <div className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-[var(--shadow)]">
               <h2 className="text-lg font-bold">Incoming Requests</h2>
               <div className="mt-4 space-y-3">
-                {pendingIncoming.map((req) => (
-                  <div key={req.id} className="rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-                    <p className="text-sm font-semibold">
-                      {req.requester?.full_name || req.requester?.username || "Player"}
-                    </p>
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        onClick={() => acceptRequest(req.id)}
-                        className="flex-1 rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => declineRequest(req.id)}
-                        className="flex-1 rounded-full border border-[var(--accent)] bg-white px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--surface-2)] shadow-sm"
-                      >
-                        Decline
-                      </button>
+                {pendingIncoming.map((req) => {
+                  const gameType = req.game_type || "chess";
+                  const handleAccept = async () => {
+                    const result = await acceptRequest(req.id);
+                    if (!result.error) {
+                      if (result.gameType === "ludo" && result.sessionId) {
+                        router.push(`/games/ludo?session=${result.sessionId}&multiplayer=true`);
+                      } else if (result.matchId) {
+                        router.push(`/match/${result.matchId}`);
+                      }
+                    }
+                  };
+                  return (
+                    <div key={req.id} className="rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">
+                          {req.requester?.full_name || req.requester?.username || "Player"}
+                        </p>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${gameType === 'ludo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {gameType === 'ludo' ? '🎲 Ludo' : '♟ Chess'}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={handleAccept}
+                          className="flex-1 rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => declineRequest(req.id)}
+                          className="flex-1 rounded-full border border-[var(--accent)] bg-white px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--surface-2)] shadow-sm"
+                        >
+                          Decline
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {pendingIncoming.length === 0 && (
                   <p className="text-sm text-[var(--muted)]">No pending requests.</p>
                 )}
