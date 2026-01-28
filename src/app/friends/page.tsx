@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMatchRequests, GameType } from "@/hooks/use-match-requests";
-import { useMatchInvites } from "@/hooks/use-invites";
+import { useMatchInvites, useNotifications } from "@/hooks/use-invites";
 import { AuthHeaderActions } from "@/components/auth/auth-header-actions";
 import { Users, X, Check, Loader2 } from "lucide-react";
 
@@ -31,6 +31,7 @@ export default function FriendsPage() {
   const { pendingIncoming, pendingOutgoing, activeMatches, activeLudoSessions, sendRequest, acceptRequest, declineRequest } =
     useMatchRequests();
   const { pendingInvites, createMatchAndInvite, acceptInvite, declineInvite } = useMatchInvites({ userId: user?.id });
+  const { notifications, markAsRead } = useNotifications({ userId: user?.id });
 
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [presence, setPresence] = useState<Record<string, PresenceRow>>({});
@@ -98,6 +99,22 @@ export default function FriendsPage() {
       return name.includes(query);
     });
   }, [profiles, search]);
+
+  const matchStartedNotifs = useMemo(() => {
+    return (notifications ?? []).filter((n) => n.type === "match_started" && !n.read_at);
+  }, [notifications]);
+
+  const handleJoinStartedMatch = async (notifId: string, payload: Record<string, unknown>) => {
+    const matchId = payload.matchId as string | undefined;
+    const gameType = (payload.gameType as GameType | undefined) ?? "ludo";
+    if (!matchId) return;
+    await markAsRead(notifId);
+    if (gameType === "ludo") {
+      router.push(`/games/ludo?match=${matchId}&multiplayer=true`);
+    } else {
+      router.push(`/match/${matchId}`);
+    }
+  };
 
   // Toggle friend selection for Ludo game
   const toggleFriendSelection = (friendId: string) => {
@@ -177,6 +194,31 @@ export default function FriendsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
+        {matchStartedNotifs.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {matchStartedNotifs.map((notif) => (
+              <div
+                key={notif.id}
+                className="flex flex-col gap-3 rounded-3xl border border-purple-200 bg-purple-50 px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-purple-500">
+                    Match Started
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-purple-900">
+                    {notif.message || "A match is live. Join to start playing."}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleJoinStartedMatch(notif.id, notif.payload)}
+                  className="rounded-full bg-purple-600 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-110"
+                >
+                  Join Game
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <section className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
           <div className="rounded-[32px] border border-[var(--line)] bg-white p-8 shadow-[var(--shadow)]">
             <div className="flex items-center justify-between">
