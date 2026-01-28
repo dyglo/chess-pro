@@ -7,7 +7,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMatchRequests, GameType } from "@/hooks/use-match-requests";
+import { useMatchInvites } from "@/hooks/use-invites";
 import { AuthHeaderActions } from "@/components/auth/auth-header-actions";
+import { Users, X, Check, Loader2 } from "lucide-react";
 
 type ProfileLite = {
   id: string;
@@ -28,12 +30,20 @@ export default function FriendsPage() {
   const router = useRouter();
   const { pendingIncoming, pendingOutgoing, activeMatches, activeLudoSessions, sendRequest, acceptRequest, declineRequest } =
     useMatchRequests();
+  const { pendingInvites, createMatchAndInvite, acceptInvite, declineInvite } = useMatchInvites({ userId: user?.id });
+
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [presence, setPresence] = useState<Record<string, PresenceRow>>({});
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState<Record<string, GameType>>({});
+
+  // Create Ludo Game modal state
+  const [showCreateLudoModal, setShowCreateLudoModal] = useState(false);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [isCreatingGame, setIsCreatingGame] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -89,6 +99,56 @@ export default function FriendsPage() {
     });
   }, [profiles, search]);
 
+  // Toggle friend selection for Ludo game
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriends(prev => {
+      if (prev.includes(friendId)) {
+        return prev.filter(id => id !== friendId);
+      }
+      // Max 3 friends (4 players total including host)
+      if (prev.length >= 3) {
+        return prev;
+      }
+      return [...prev, friendId];
+    });
+  };
+
+  // Create Ludo game and send invites
+  const handleCreateLudoGame = async () => {
+    if (selectedFriends.length === 0) {
+      setCreateError("Select at least 1 friend to invite");
+      return;
+    }
+
+    setIsCreatingGame(true);
+    setCreateError(null);
+
+    try {
+      const result = await createMatchAndInvite("ludo", selectedFriends);
+
+      if (result.success && result.matchId) {
+        // Redirect to lobby page
+        router.push(`/match/${result.matchId}/lobby?game=ludo`);
+      } else {
+        setCreateError(result.error || "Failed to create game");
+      }
+    } catch (err) {
+      console.error("Create game error:", err);
+      setCreateError((err as Error).message);
+    } finally {
+      setIsCreatingGame(false);
+    }
+  };
+
+  // Handle accepting new invite system invites
+  const handleAcceptNewInvite = async (inviteId: string) => {
+    const result = await acceptInvite(inviteId);
+    if (result.success && result.matchId) {
+      const gameType = result.gameType || "ludo";
+      router.push(`/match/${result.matchId}/lobby?game=${gameType}`);
+    }
+  };
+
   if (isAuthLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
@@ -108,11 +168,8 @@ export default function FriendsPage() {
             </span>
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold">
-            <Link href="/play" className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
-              Back to Game
-            </Link>
-            <Link href="/analytics" className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 shadow-sm">
-              View Analytics
+            <Link href="/games" className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
+              Games
             </Link>
             <AuthHeaderActions variant="light" />
           </div>
@@ -122,12 +179,30 @@ export default function FriendsPage() {
       <main className="mx-auto max-w-7xl px-6 py-10">
         <section className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
           <div className="rounded-[32px] border border-[var(--line)] bg-white p-8 shadow-[var(--shadow)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Friends & Matches
-            </p>
-            <h1 className="mt-3 text-4xl font-bold tracking-tight">Find your next rival</h1>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                  Friends & Matches
+                </p>
+                <h1 className="mt-3 text-4xl font-bold tracking-tight">Find your next rival</h1>
+              </div>
+
+              {/* Create Ludo Game Button */}
+              <button
+                onClick={() => {
+                  setShowCreateLudoModal(true);
+                  setSelectedFriends([]);
+                  setCreateError(null);
+                }}
+                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-105 hover:shadow-xl"
+              >
+                <Users className="h-4 w-4" />
+                Create Ludo Game
+              </button>
+            </div>
+
             <p className="mt-3 max-w-xl text-sm text-[var(--muted)]">
-              Discover every player on ChessPro and challenge them to a real-time match. All requests are stored and delivered when they come online.
+              Create a Ludo game and invite up to 3 friends, or challenge players 1-on-1.
             </p>
 
             <div className="mt-6 rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
@@ -189,15 +264,14 @@ export default function FriendsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* Game Selector */}
+                          {/* Game Selector - only for 1v1 Chess */}
                           <select
                             value={gameChoice}
                             onChange={(e) => setSelectedGame(prev => ({ ...prev, [profile.id]: e.target.value as GameType }))}
                             disabled={isPending}
                             className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:opacity-50"
                           >
-                            <option value="chess">♟ Chess</option>
-                            <option value="ludo">🎲 Ludo</option>
+                            <option value="chess">♟ Chess (1v1)</option>
                           </select>
                           <button
                             onClick={() => sendRequest(profile.id, gameChoice)}
@@ -207,7 +281,7 @@ export default function FriendsPage() {
                               : "bg-[var(--accent)] text-white hover:opacity-90"
                               }`}
                           >
-                            {isPending ? "Requested" : "Send Request"}
+                            {isPending ? "Requested" : "Challenge"}
                           </button>
                         </div>
                       </div>
@@ -225,6 +299,54 @@ export default function FriendsPage() {
           </div>
 
           <div className="flex flex-col gap-6">
+            {/* New Invite System - Game Invites */}
+            {pendingInvites.length > 0 && (
+              <div className="rounded-[32px] border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-6 shadow-lg">
+                <h2 className="flex items-center gap-2 text-lg font-bold text-purple-900">
+                  <Users className="h-5 w-5" />
+                  Game Invites
+                </h2>
+                <div className="mt-4 space-y-3">
+                  {pendingInvites.map((invite) => (
+                    <div key={invite.id} className="rounded-2xl border border-purple-200 bg-white p-4 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-10 w-10 overflow-hidden rounded-full border border-purple-200">
+                          <Image
+                            src={invite.from_user?.avatar_url || "/avatars/user-placeholder.jpg"}
+                            alt={invite.from_user?.full_name || "Player"}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-purple-900">
+                            {invite.from_user?.full_name || invite.from_user?.username || "Player"}
+                          </p>
+                          <p className="text-xs text-purple-600">Invited you to Ludo</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => handleAcceptNewInvite(invite.id)}
+                          className="flex-1 flex items-center justify-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                        >
+                          <Check className="h-3 w-3" />
+                          Join Game
+                        </button>
+                        <button
+                          onClick={() => declineInvite(invite.id)}
+                          className="flex-1 rounded-full border border-purple-300 bg-white px-3 py-2 text-xs font-bold text-purple-700 transition hover:bg-purple-50"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Legacy Incoming Requests (Chess 1v1) */}
             <div className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-[var(--shadow)]">
               <h2 className="text-lg font-bold">Incoming Requests</h2>
               <div className="mt-4 space-y-3">
@@ -238,7 +360,6 @@ export default function FriendsPage() {
                       } else if (result.matchId) {
                         router.push(`/match/${result.matchId}`);
                       } else {
-                        // Fallback or error if no ID returned
                         console.error("No match/session ID returned for accepted request");
                       }
                     }
@@ -285,17 +406,6 @@ export default function FriendsPage() {
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        // Logic to dismiss/hide?
-                        // Since we don't have a shared context yet, we can't persist this globally easily without new state.
-                        // But for now, simple local hide or maybe a "leave" button?
-                        // User asked for "clear button to clear the current notification".
-                        // This creates a UI expectation of removal.
-                        // Let's implement active session hiding? No, that's dangerous if they can't get it back.
-                        // But usually "Clear" means hide notification.
-                        // I will add a small X button that hides this element locally *if* it's just a notification list.
-                        // Actually, on Friends page, this is the MATCH LIST. Hiding it means losing access?
-                        // Unless they can access via "Games" page?
-                        // I'll stick to a visual dismiss (X) that hides it from THIS view.
                         const el = document.getElementById(`session-${session.id}`);
                         if (el) el.style.display = 'none';
                       }}
@@ -362,6 +472,113 @@ export default function FriendsPage() {
           </div>
         </section>
       </main>
+
+      {/* Create Ludo Game Modal */}
+      {showCreateLudoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg mx-4 rounded-[32px] bg-white p-8 shadow-2xl">
+            <button
+              onClick={() => setShowCreateLudoModal(false)}
+              className="absolute top-4 right-4 rounded-full p-2 hover:bg-gray-100 transition"
+            >
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-3xl">
+                🎲
+              </div>
+              <h2 className="mt-4 text-2xl font-bold">Create Ludo Game</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Select 1-3 friends to invite. The game will start when everyone joins.
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)] mb-3">
+                Select Friends ({selectedFriends.length}/3)
+              </p>
+
+              <div className="max-h-[300px] overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-2">
+                {profiles.map((profile) => {
+                  const isSelected = selectedFriends.includes(profile.id);
+                  const isOnline = presence[profile.id]?.is_online ?? false;
+
+                  return (
+                    <button
+                      key={profile.id}
+                      onClick={() => toggleFriendSelection(profile.id)}
+                      disabled={!isSelected && selectedFriends.length >= 3}
+                      className={`w-full flex items-center justify-between rounded-xl p-3 mb-1 transition ${isSelected
+                          ? "bg-purple-100 border-2 border-purple-400"
+                          : "bg-white border border-transparent hover:border-purple-200"
+                        } ${!isSelected && selectedFriends.length >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-10 w-10 overflow-hidden rounded-full border border-[var(--line)]">
+                          <Image
+                            src={profile.avatar_url || "/avatars/user-placeholder.jpg"}
+                            alt={profile.full_name || "Player"}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-semibold">{profile.full_name || "Player"}</p>
+                          <p className={`text-xs ${isOnline ? "text-green-600" : "text-[var(--muted)]"}`}>
+                            {isOnline ? "● Online" : "○ Offline"}
+                          </p>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div className="flex items-center justify-center h-6 w-6 rounded-full bg-purple-500 text-white">
+                          <Check className="h-4 w-4" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {profiles.length === 0 && (
+                  <p className="text-center text-sm text-[var(--muted)] py-8">No friends found.</p>
+                )}
+              </div>
+            </div>
+
+            {createError && (
+              <div className="mt-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                {createError}
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowCreateLudoModal(false)}
+                className="flex-1 rounded-full border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold transition hover:bg-[var(--surface-2)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateLudoGame}
+                disabled={selectedFriends.length === 0 || isCreatingGame}
+                className="flex-1 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingGame ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Users className="h-4 w-4" />
+                    Create & Invite ({selectedFriends.length})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="fixed bottom-6 right-6 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -29,6 +29,7 @@ export interface FriendRequest {
 export interface MatchRow {
   id: string;
   status: "pending" | "active" | "completed" | "cancelled";
+  game_type?: GameType | null;
   white_user_id?: string | null;
   black_user_id?: string | null;
   game_id?: string | null;
@@ -41,6 +42,20 @@ export interface LudoSessionRow {
   id: string;
   status: string;
   created_at?: string;
+}
+
+export interface MatchRosterRow {
+  id: string;
+  match_id: string;
+  user_id: string | null;
+  seat_index: number;
+  status: "joined" | "pending" | "left" | "kicked";
+  is_ai: boolean;
+  color: string | null;
+  display_name?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+  country?: string | null;
 }
 
 async function fetchProfilesByIds(ids: string[]) {
@@ -58,8 +73,48 @@ export function useMatchRequests() {
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [ludoSessions, setLudoSessions] = useState<LudoSessionRow[]>([]);
+  const [matchRosters, setMatchRosters] = useState<Record<string, MatchRosterRow[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const rosterCacheRef = useRef<Record<string, MatchRosterRow[]>>({});
+
+  const fetchMatchRosters = useCallback(
+    async (matchIds: string[]) => {
+      if (!user || matchIds.length === 0) return;
+      const supabase = createClient();
+      const uniqueIds = Array.from(new Set(matchIds)).filter(
+        (id) => !rosterCacheRef.current[id]
+      );
+      if (uniqueIds.length === 0) return;
+
+      const results = await Promise.all(
+        uniqueIds.map(async (matchId) => {
+          const { data, error: rosterError } = await supabase.rpc("get_match_roster", {
+            p_match_id: matchId,
+          });
+          if (rosterError) {
+            console.error(
+              "Error fetching match roster:",
+              rosterError.message,
+              rosterError.code
+            );
+            return { matchId, roster: null as MatchRosterRow[] | null };
+          }
+          return { matchId, roster: (data ?? []) as MatchRosterRow[] };
+        })
+      );
+
+      const updated = { ...rosterCacheRef.current };
+      results.forEach((result) => {
+        if (result.roster) {
+          updated[result.matchId] = result.roster;
+        }
+      });
+      rosterCacheRef.current = updated;
+      setMatchRosters(updated);
+    },
+    [user]
+  );
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -76,13 +131,17 @@ export function useMatchRequests() {
         .or(`requester_id.eq.${user.id},recipient_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
-      if (requestError) throw requestError;
+      if (requestError) {
+        console.error("Error fetching friend requests:", requestError);
+        throw new Error(`Friend requests error: ${requestError.message}`);
+      }
 
       const profileIds = Array.from(
         new Set(
           (requestRows ?? []).flatMap((r) => [r.requester_id, r.recipient_id])
         )
       );
+
       const profiles = await fetchProfilesByIds(profileIds);
       const profileMap = new Map(profiles.map((p) => [p.id, p]));
 
@@ -97,13 +156,20 @@ export function useMatchRequests() {
       // Fetch active Chess matches
       const { data: matchRows, error: matchError } = await supabase
         .from("matches")
-        .select("*")
+        .select("id, status, game_type, white_user_id, black_user_id, game_id, created_at, started_at, ended_at")
         .or(`white_user_id.eq.${user.id},black_user_id.eq.${user.id}`)
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
-      if (matchError) throw matchError;
+      if (matchError) {
+        console.error("Error fetching matches:", matchError.message, matchError.code);
+        throw new Error(`Matches error: ${matchError.message}`);
+      }
       setMatches(matchRows ?? []);
+      const ludoMatchIds = (matchRows ?? [])
+        .filter((match) => match.game_type === "ludo")
+        .map((match) => match.id);
+      await fetchMatchRosters(ludoMatchIds);
 
       // Fetch active Ludo sessions
       const { data: playerRows, error: playerError } = await supabase
@@ -111,7 +177,10 @@ export function useMatchRequests() {
         .select("session_id")
         .eq("user_id", user.id);
 
-      if (playerError) throw playerError;
+      if (playerError) {
+        console.error("Error fetching ludo players:", playerError);
+        throw new Error(`Ludo players error: ${playerError.message}`);
+      }
 
       if (playerRows && playerRows.length > 0) {
         const sessionIds = playerRows.map(p => p.session_id);
@@ -121,19 +190,26 @@ export function useMatchRequests() {
           .in("id", sessionIds)
           .eq("status", "playing");
 
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.error("Error fetching ludo sessions:", sessionError);
+          throw new Error(`Ludo sessions error: ${sessionError.message}`);
+        }
         setLudoSessions(sessionRows ?? []);
       } else {
         setLudoSessions([]);
       }
 
-    } catch (err) {
-      console.error("Error refreshing match data:", err);
-      setError((err as Error).message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to refresh match data";
+      console.error("Error refreshing match data:", errorMessage);
+      if (err instanceof Error && err.stack) {
+        console.error("Error stack:", err.stack);
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, fetchMatchRosters]);
 
   useEffect(() => {
     if (!user) return;
@@ -294,6 +370,8 @@ export function useMatchRequests() {
     activeLudoSessions,
     pendingIncoming,
     pendingOutgoing,
+    matchRosters,
+    fetchMatchRosters,
     isLoading,
     error,
     sendRequest,

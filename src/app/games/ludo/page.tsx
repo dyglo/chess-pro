@@ -7,6 +7,7 @@ import { LudoBoard } from "./components/LudoBoard";
 import { LudoPlayerCard } from "./components/PlayerCard";
 import { LudoDice } from "./components/ludo-dice";
 import { useLudoGame } from "@/hooks/use-ludo-game";
+import { useLudoRealtime } from "@/hooks/use-ludo-realtime";
 import { useAuth } from "@/hooks/use-auth";
 import { UserDropdown } from "@/components/play/user-dropdown";
 import { ProfileSettingsModal } from "@/components/play/profile-settings-modal";
@@ -31,6 +32,7 @@ function LudoGameContent() {
     const { user, signOut } = useAuth();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get("session");
+    const matchId = searchParams.get("match"); // New: match ID for realtime mode
     const isMultiplayer = searchParams.get("multiplayer") === "true";
 
     const [userProfile, setUserProfile] = useState<{
@@ -73,6 +75,31 @@ function LudoGameContent() {
         fetchProfile();
     }, [user, showProfileSettings]);
 
+    // Use the new realtime hook for multiplayer with matchId, otherwise use legacy hook
+    const useRealtimeMode = isMultiplayer && matchId;
+
+    // Legacy hook for solo/session-based games
+    const legacyGame = useLudoGame({
+        userId: user?.id,
+        userProfile,
+        onGameEnd: (winner) => {
+            console.log("Game ended, winner:", winner);
+        },
+        existingSessionId: sessionId,
+        isMultiplayer: isMultiplayer && !matchId, // Use legacy only if no matchId
+    });
+
+    // New realtime hook for multiplayer with matchId
+    const realtimeGame = useLudoRealtime({
+        matchId: matchId || "",
+        userId: user?.id,
+        userProfile,
+        onGameEnd: (winner) => {
+            console.log("Game ended, winner:", winner);
+        },
+    });
+
+    // Select which hook to use
     const {
         state,
         isRolling,
@@ -81,15 +108,7 @@ function LudoGameContent() {
         handleTokenMove,
         newGame,
         isCurrentPlayerAi,
-    } = useLudoGame({
-        userId: user?.id,
-        userProfile,
-        onGameEnd: (winner) => {
-            console.log("Game ended, winner:", winner);
-        },
-        existingSessionId: sessionId,
-        isMultiplayer,
-    });
+    } = useRealtimeMode ? { ...realtimeGame, isConnected: realtimeGame.isConnected } : { ...legacyGame, isConnected: true };
 
     // Get display name for player
     const getPlayerName = (playerIndex: number) => {
@@ -108,6 +127,28 @@ function LudoGameContent() {
         avatarUrl: (!isMultiplayer && idx === 0) ? (userProfile?.avatar_url || undefined) : (p.avatarUrl || undefined),
         country: (!isMultiplayer && idx === 0) ? (userProfile?.country || getAICountry(idx)) : (p.country || getAICountry(idx)),
     }));
+
+    const rosterPlayers = useRealtimeMode ? realtimeGame.getPlayers() : [];
+    const normalizedPlayers = Array.from({ length: 4 }, (_, idx) => {
+        const roster = rosterPlayers.find((p) => p.seatIndex === idx);
+        const fallback = {
+            id: `seat-${idx}`,
+            name: `Player ${idx + 1}`,
+            isAi: false,
+            avatarUrl: undefined as string | undefined,
+            country: getAICountry(idx),
+        };
+        if (roster) {
+            return {
+                id: roster.id,
+                name: roster.name,
+                isAi: roster.isAi,
+                avatarUrl: roster.avatarUrl || undefined,
+                country: roster.country || getAICountry(idx),
+            };
+        }
+        return players[idx] ?? fallback;
+    });
 
     return (
         <div className="h-screen bg-[#F8F9FA] flex flex-col font-sans text-[var(--foreground)] selection:bg-[var(--accent)]/20 overflow-hidden">
@@ -176,12 +217,12 @@ function LudoGameContent() {
                         <div className="flex flex-col gap-3 h-full justify-center">
                             {/* Human Player Card */}
                             <LudoPlayerCard
-                                name={players[0].name}
-                                isAi={players[0].isAi}
+                                name={normalizedPlayers[0].name}
+                                isAi={normalizedPlayers[0].isAi}
                                 color="blue"
                                 isActive={state.currentPlayerIndex === 0}
-                                avatarUrl={players[0].avatarUrl || undefined}
-                                country={players[0].country}
+                                avatarUrl={normalizedPlayers[0].avatarUrl || undefined}
+                                country={normalizedPlayers[0].country}
                             />
 
                             {/* Action Panel with Dice */}
@@ -221,11 +262,11 @@ function LudoGameContent() {
 
                             {/* Yellow AI Player */}
                             <LudoPlayerCard
-                                name={players[3].name}
-                                isAi={players[3].isAi}
+                                name={normalizedPlayers[3].name}
+                                isAi={normalizedPlayers[3].isAi}
                                 color="yellow"
                                 isActive={state.currentPlayerIndex === 3}
-                                country={players[3].country}
+                                country={normalizedPlayers[3].country}
                             />
                         </div>
 
@@ -234,19 +275,19 @@ function LudoGameContent() {
                             {/* Top Players Strip */}
                             <div className="flex justify-between w-full max-w-[400px] mb-3 gap-4">
                                 <LudoPlayerCard
-                                    name={players[1].name}
-                                    isAi={players[1].isAi}
+                                    name={normalizedPlayers[1].name}
+                                    isAi={normalizedPlayers[1].isAi}
                                     color="red"
                                     isActive={state.currentPlayerIndex === 1}
-                                    country={players[1].country}
+                                    country={normalizedPlayers[1].country}
                                     className="flex-1"
                                 />
                                 <LudoPlayerCard
-                                    name={players[2].name}
-                                    isAi={players[2].isAi}
+                                    name={normalizedPlayers[2].name}
+                                    isAi={normalizedPlayers[2].isAi}
                                     color="green"
                                     isActive={state.currentPlayerIndex === 2}
-                                    country={players[2].country}
+                                    country={normalizedPlayers[2].country}
                                     className="flex-1"
                                 />
                             </div>
@@ -264,20 +305,20 @@ function LudoGameContent() {
                             {/* Bottom Players Strip */}
                             <div className="flex justify-between w-full max-w-[400px] mt-3 gap-4">
                                 <LudoPlayerCard
-                                    name={players[0].name}
-                                    isAi={players[0].isAi}
+                                    name={normalizedPlayers[0].name}
+                                    isAi={normalizedPlayers[0].isAi}
                                     color="blue"
                                     isActive={state.currentPlayerIndex === 0}
-                                    avatarUrl={players[0].avatarUrl || undefined}
-                                    country={players[0].country}
+                                    avatarUrl={normalizedPlayers[0].avatarUrl || undefined}
+                                    country={normalizedPlayers[0].country}
                                     className="flex-1"
                                 />
                                 <LudoPlayerCard
-                                    name={players[3].name}
-                                    isAi={players[3].isAi}
+                                    name={normalizedPlayers[3].name}
+                                    isAi={normalizedPlayers[3].isAi}
                                     color="yellow"
                                     isActive={state.currentPlayerIndex === 3}
-                                    country={players[3].country}
+                                    country={normalizedPlayers[3].country}
                                     className="flex-1"
                                 />
                             </div>
@@ -300,7 +341,7 @@ function LudoGameContent() {
                                         state.currentPlayerIndex === 3 && "bg-yellow-500"
                                     )} />
                                     <span className="text-sm font-semibold">
-                                        {players[state.currentPlayerIndex].name}
+                                        {normalizedPlayers[state.currentPlayerIndex]?.name || "Player"}
                                     </span>
                                 </div>
                                 {isCurrentPlayerAi && (
@@ -316,20 +357,20 @@ function LudoGameContent() {
                         {/* Top Players */}
                         <div className="w-full flex justify-between gap-2 px-2">
                             <LudoPlayerCard
-                                name={players[0].name}
-                                isAi={players[0].isAi}
+                                name={normalizedPlayers[0].name}
+                                isAi={normalizedPlayers[0].isAi}
                                 color="blue"
                                 isActive={state.currentPlayerIndex === 0}
-                                avatarUrl={players[0].avatarUrl || undefined}
-                                country={players[0].country}
+                                avatarUrl={normalizedPlayers[0].avatarUrl || undefined}
+                                country={normalizedPlayers[0].country}
                                 className="flex-1 scale-90 origin-left"
                             />
                             <LudoPlayerCard
-                                name={players[1].name}
-                                isAi={players[1].isAi}
+                                name={normalizedPlayers[1].name}
+                                isAi={normalizedPlayers[1].isAi}
                                 color="red"
                                 isActive={state.currentPlayerIndex === 1}
-                                country={players[1].country}
+                                country={normalizedPlayers[1].country}
                                 className="flex-1 scale-90 origin-right"
                             />
                         </div>
@@ -357,19 +398,19 @@ function LudoGameContent() {
                         {/* Bottom Players */}
                         <div className="w-full flex justify-between gap-2 px-2">
                             <LudoPlayerCard
-                                name={players[3].name}
-                                isAi={players[3].isAi}
+                                name={normalizedPlayers[3].name}
+                                isAi={normalizedPlayers[3].isAi}
                                 color="yellow"
                                 isActive={state.currentPlayerIndex === 3}
-                                country={players[3].country}
+                                country={normalizedPlayers[3].country}
                                 className="flex-1 scale-90 origin-left"
                             />
                             <LudoPlayerCard
-                                name={players[2].name}
-                                isAi={players[2].isAi}
+                                name={normalizedPlayers[2].name}
+                                isAi={normalizedPlayers[2].isAi}
                                 color="green"
                                 isActive={state.currentPlayerIndex === 2}
-                                country={players[2].country}
+                                country={normalizedPlayers[2].country}
                                 className="flex-1 scale-90 origin-right"
                             />
                         </div>
@@ -383,7 +424,7 @@ function LudoGameContent() {
                     <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
                         <h2 className="text-3xl font-black mb-2">Game Over!</h2>
                         <p className="text-lg text-gray-600 mb-6">
-                            {players[state.winner].name} wins!
+                            {normalizedPlayers[state.winner]?.name || "Player"} wins!
                         </p>
                         <button
                             onClick={newGame}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChessBoardWrapper } from "@/components/play/chess-board-wrapper";
 import { PlayerProfile } from "@/components/play/player-profile";
 import { MoveHistory } from "@/components/play/move-history";
@@ -23,10 +23,146 @@ type ProfileLite = {
   country?: string | null;
 };
 
+type MatchData = {
+  id: string;
+  status: string;
+  game_type: string;
+  created_by: string;
+  white_user_id?: string;
+  black_user_id?: string;
+  started_at?: string;
+};
+
 export default function MatchPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const matchId = params.matchId as string;
+  const gameTypeParam = searchParams.get("game");
   const { user } = useAuth();
+
+  const [matchData, setMatchData] = useState<MatchData | null>(null);
+  const [isLoadingMatch, setIsLoadingMatch] = useState(true);
+  const [matchError, setMatchError] = useState<string | null>(null);
+
+  // Fetch match data to determine game type and status
+  useEffect(() => {
+    if (!matchId) return;
+
+    const fetchMatch = async () => {
+      setIsLoadingMatch(true);
+      setMatchError(null);
+
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("matches")
+          .select("id, status, game_type, created_by, white_user_id, black_user_id, started_at")
+          .eq("id", matchId)
+          .single();
+
+        if (error) throw error;
+        setMatchData(data);
+
+        // If match is active and it's Ludo, redirect to Ludo page
+        if (data.status === "active" && (data.game_type === "ludo" || gameTypeParam === "ludo")) {
+          router.replace(`/games/ludo?match=${matchId}&multiplayer=true`);
+        }
+      } catch (err) {
+        console.error("Match fetch error:", err);
+        setMatchError((err as Error).message);
+      } finally {
+        setIsLoadingMatch(false);
+      }
+    };
+
+    fetchMatch();
+
+    // Subscribe to match changes
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`match-status:${matchId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "matches",
+          filter: `id=eq.${matchId}`,
+        },
+        (payload) => {
+          const updated = payload.new as MatchData;
+          setMatchData(updated);
+
+          // Redirect when match becomes active
+          if (updated.status === "active") {
+            if (updated.game_type === "ludo" || gameTypeParam === "ludo") {
+              router.replace(`/games/ludo?match=${matchId}&multiplayer=true`);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [matchId, router, gameTypeParam]);
+
+  // Show lobby for pending/lobby status
+  const showLobby = matchData && (matchData.status === "pending" || matchData.status === "lobby");
+  const isLudoGame = matchData?.game_type === "ludo" || gameTypeParam === "ludo";
+
+  // Only use chess hooks if this is a chess game and match is active
+  const shouldUseChessHooks = matchData && matchData.status === "active" && !isLudoGame;
+
+  if (isLoadingMatch) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (matchError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] gap-4">
+        <p className="text-red-600 font-semibold">Error loading match: {matchError}</p>
+        <Link href="/friends" className="text-[var(--accent)] hover:underline">
+          Back to Friends
+        </Link>
+      </div>
+    );
+  }
+
+  // Redirect to lobby route for pending games
+  if (showLobby) {
+    router.replace(`/match/${matchId}/lobby?game=${isLudoGame ? "ludo" : "chess"}`);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // For active chess games, render the chess board
+  if (shouldUseChessHooks) {
+    return <ChessMatchView matchId={matchId} user={user} />;
+  }
+
+  // Fallback loading state
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+      <div className="text-center">
+        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-[var(--muted)]">Loading game...</p>
+      </div>
+    </div>
+  );
+}
+
+// Separate component for chess match to avoid hook rules issues
+function ChessMatchView({ matchId, user }: { matchId: string; user: { id: string } | null }) {
   const { match, gameState, isLoading, error, myColor, isMyTurn, makeMove, getLegalMoves, moveHistory } =
     useRealtimeMatch(matchId);
   const [profiles, setProfiles] = useState<Record<string, ProfileLite>>({});
