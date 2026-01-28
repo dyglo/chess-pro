@@ -37,6 +37,12 @@ export interface MatchRow {
   ended_at?: string | null;
 }
 
+export interface LudoSessionRow {
+  id: string;
+  status: string;
+  created_at?: string;
+}
+
 async function fetchProfilesByIds(ids: string[]) {
   if (ids.length === 0) return [];
   const supabase = createClient();
@@ -51,6 +57,7 @@ export function useMatchRequests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [ludoSessions, setLudoSessions] = useState<LudoSessionRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +68,8 @@ export function useMatchRequests() {
 
     try {
       const supabase = createClient();
+
+      // Fetch friend requests
       const { data: requestRows, error: requestError } = await supabase
         .from("friend_requests")
         .select("*")
@@ -85,15 +94,41 @@ export function useMatchRequests() {
 
       setRequests(hydrated);
 
+      // Fetch active Chess matches
       const { data: matchRows, error: matchError } = await supabase
         .from("matches")
         .select("*")
         .or(`white_user_id.eq.${user.id},black_user_id.eq.${user.id}`)
+        .eq("status", "active")
         .order("created_at", { ascending: false });
 
       if (matchError) throw matchError;
       setMatches(matchRows ?? []);
+
+      // Fetch active Ludo sessions
+      const { data: playerRows, error: playerError } = await supabase
+        .from("ludo_players")
+        .select("session_id")
+        .eq("user_id", user.id);
+
+      if (playerError) throw playerError;
+
+      if (playerRows && playerRows.length > 0) {
+        const sessionIds = playerRows.map(p => p.session_id);
+        const { data: sessionRows, error: sessionError } = await supabase
+          .from("ludo_sessions")
+          .select("*")
+          .in("id", sessionIds)
+          .eq("status", "playing");
+
+        if (sessionError) throw sessionError;
+        setLudoSessions(sessionRows ?? []);
+      } else {
+        setLudoSessions([]);
+      }
+
     } catch (err) {
+      console.error("Error refreshing match data:", err);
       setError((err as Error).message);
     } finally {
       setIsLoading(false);
@@ -108,8 +143,9 @@ export function useMatchRequests() {
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
+
     const requestsChannel = supabase
-      .channel("friend-requests")
+      .channel("friend-requests-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "friend_requests", filter: `recipient_id=eq.${user.id}` },
@@ -123,7 +159,7 @@ export function useMatchRequests() {
       .subscribe();
 
     const matchesChannel = supabase
-      .channel("matches-updates")
+      .channel("matches-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "matches", filter: `white_user_id=eq.${user.id}` },
@@ -136,9 +172,19 @@ export function useMatchRequests() {
       )
       .subscribe();
 
+    const ludoChannel = supabase
+      .channel("ludo-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ludo_players", filter: `user_id=eq.${user.id}` },
+        () => refresh()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(requestsChannel);
       supabase.removeChannel(matchesChannel);
+      supabase.removeChannel(ludoChannel);
     };
   }, [user, refresh]);
 
@@ -226,10 +272,17 @@ export function useMatchRequests() {
     [matches]
   );
 
+  const activeLudoSessions = useMemo(
+    () => ludoSessions.filter((s) => s.status === "playing"),
+    [ludoSessions]
+  );
+
   return {
     requests,
     matches,
     activeMatches,
+    ludoSessions,
+    activeLudoSessions,
     pendingIncoming,
     pendingOutgoing,
     isLoading,
