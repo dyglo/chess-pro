@@ -17,6 +17,8 @@ import { LudoSettingsModal } from "@/components/play/ludo-settings-modal";
 import { defaultLudoStyle, getLudoStyleById } from "@/lib/ludo/board-styles";
 import { LudoThemeToggle } from "./components/theme-toggle";
 import { FINISH_POS } from "@/lib/ludo/ludo-state";
+import { useMatchChat } from "@/hooks/use-match-chat";
+import { LudoMatchChat } from "./components/ludo-match-chat";
 
 export default function LudoPage() {
     return (
@@ -49,6 +51,7 @@ function LudoGameContent() {
     const [boardStyleId, setBoardStyleId] = useState(defaultLudoStyle.id);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [showTimeline, setShowTimeline] = useState(false);
+    const [showChat, setShowChat] = useState(false);
 
     useEffect(() => {
         const savedStyle = localStorage.getItem("ludo-board-style");
@@ -141,6 +144,8 @@ function LudoGameContent() {
         captureEffect,
         knockedTokenIds,
     } = useRealtimeMode ? { ...realtimeGame } : { ...legacyGame, captureEffect: null, knockedTokenIds: [] };
+
+    const chat = useMatchChat(matchId ?? undefined, user?.id);
 
     // Get display name for player
     const getPlayerName = (playerIndex: number) => {
@@ -456,6 +461,15 @@ function LudoGameContent() {
                                 )}
                             </div>
 
+                            {useRealtimeMode && matchId && (
+                                <LudoMatchChat
+                                    messages={chat.messages}
+                                    isLoading={chat.isLoading}
+                                    error={chat.error}
+                                    onSend={chat.sendMessage}
+                                    currentUserId={user?.id}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -515,6 +529,16 @@ function LudoGameContent() {
                             >
                                 <History className="w-4 h-4 text-[var(--ludo-text-muted)]" />
                             </button>
+                            {useRealtimeMode && matchId && (
+                                <button
+                                    type="button"
+                                    aria-label="Toggle chat"
+                                    onClick={() => setShowChat((prev) => !prev)}
+                                    className="p-2 rounded-md hover:bg-[var(--ludo-border-card)] transition-colors text-[10px] font-semibold text-[var(--ludo-text-muted)]"
+                                >
+                                    Chat
+                                </button>
+                            )}
                         </div>
                         {showTimeline && (
                             <div className="w-full px-4">
@@ -526,6 +550,17 @@ function LudoGameContent() {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+                        )}
+                        {showChat && useRealtimeMode && matchId && (
+                            <div className="w-full px-4">
+                                <LudoMatchChat
+                                    messages={chat.messages}
+                                    isLoading={chat.isLoading}
+                                    error={chat.error}
+                                    onSend={chat.sendMessage}
+                                    currentUserId={user?.id}
+                                />
                             </div>
                         )}
 
