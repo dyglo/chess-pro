@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { LudoBoard } from "./components/LudoBoard";
@@ -16,6 +16,18 @@ import { LudoSettingsModal } from "@/components/play/ludo-settings-modal";
 import { defaultLudoStyle, getLudoStyleById } from "@/lib/ludo/board-styles";
 
 export default function LudoPage() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen flex items-center justify-center bg-[#F8F9FA]">
+                <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <LudoGameContent />
+        </Suspense>
+    );
+}
+
+function LudoGameContent() {
     const { user, signOut } = useAuth();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get("session");
