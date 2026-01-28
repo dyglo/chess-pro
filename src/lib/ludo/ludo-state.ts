@@ -49,6 +49,14 @@ export const INITIAL_POSITIONS: Record<PlayerColor, number> = {
     yellow: 39,
 };
 
+export const TRACK_LENGTH = 52;
+export const HOME_START = 52;
+export const HOME_END = 57;
+export const FINISH_POS = 58;
+export const DOOR_INDEX = 51;
+export const SAFE_CELLS = [0, 8, 13, 21, 26, 34, 39, 47];
+export const START_OFFSETS = [0, 13, 26, 39];
+
 /**
  * Player index to color mapping (fixed assignment)
  */
@@ -97,20 +105,14 @@ export function getValidMoves(state: LudoState, diceValue: number): number[] {
 
     for (const token of currentPlayerTokens) {
         // Token already finished
-        if (token.position === 58) continue;
+        if (token.position === FINISH_POS) continue;
 
-        // Token in base - can only spawn with a 6
-        if (token.position === -1) {
-            if (diceValue === 6) {
-                validTokenIds.push(token.id);
-            }
-        }
-        // Token on track - can move forward if it doesn't exceed finish and path not blocked
-        else if (token.position + diceValue <= 58) {
-            // Check for blockades on the path
-            if (!isPathBlocked(state, token.playerIndex, token.position, diceValue)) {
-                validTokenIds.push(token.id);
-            }
+        const nextPos = computeNextPosition(token.position, diceValue);
+        if (nextPos === null) continue;
+
+        // Check for blockades on the path for track moves
+        if (!isPathBlocked(state, token.playerIndex, token.position, diceValue)) {
+            validTokenIds.push(token.id);
         }
     }
 
@@ -124,31 +126,34 @@ export function getValidMoves(state: LudoState, diceValue: number): number[] {
  * - Captures opponent tokens if landing on same global cell (except safe cells)
  * - Rolling a 6 grants another turn
  */
+/**
+ * Rules summary:
+ * - Track is relative per player (0..51), door at 51, home lane 52..57, finish 58.
+ * - Enter lane immediately after crossing the door (no wrap-around).
+ * - Knockouts occur on non-safe track squares; knocked tokens return to base.
+ */
 export function moveToken(state: LudoState, tokenId: number, diceValue: number): LudoState {
     const nextState = { ...state, tokens: [...state.tokens] };
     const tokenIndex = nextState.tokens.findIndex(t => t.id === tokenId);
     const token = { ...nextState.tokens[tokenIndex] };
 
-    if (token.position === -1) {
-        // Spawn from base directly to starting position (relative position 0)
-        // This token's position 0 maps to their color's global starting cell
-        token.position = 0;
-    } else {
-        // Move forward on the track
-        token.position += diceValue;
+    const nextPos = computeNextPosition(token.position, diceValue);
+    if (nextPos === null) {
+        return nextState;
     }
+    token.position = nextPos;
 
     nextState.tokens[tokenIndex] = token;
 
     // Check for captures (only on main track, not home stretch or base)
-    if (token.position >= 0 && token.position < 52) {
+    if (token.position >= 0 && token.position < TRACK_LENGTH) {
         const globalPos = getGlobalPosition(token.position, token.playerIndex);
 
         // Only capture if not on a safe cell
         if (!isSafeCell(globalPos)) {
             nextState.tokens = nextState.tokens.map(t => {
                 // Check opponent tokens on the main track
-                if (t.playerIndex !== token.playerIndex && t.position >= 0 && t.position < 52) {
+                if (t.playerIndex !== token.playerIndex && t.position >= 0 && t.position < TRACK_LENGTH) {
                     const otherGlobalPos = getGlobalPosition(t.position, t.playerIndex);
                     if (globalPos === otherGlobalPos) {
                         // Capture! Send opponent back to base
@@ -162,7 +167,7 @@ export function moveToken(state: LudoState, tokenId: number, diceValue: number):
 
     // Check for winner (all 4 tokens at position 58)
     const playerTokens = nextState.tokens.filter(t => t.playerIndex === state.currentPlayerIndex);
-    if (playerTokens.every(t => t.position === 58)) {
+    if (playerTokens.every(t => t.position === FINISH_POS)) {
         nextState.winner = state.currentPlayerIndex;
         nextState.gameStatus = 'finished';
     }
@@ -180,11 +185,8 @@ export function moveToken(state: LudoState, tokenId: number, diceValue: number):
  * Convert a player's relative position (0-51) to global board position (0-51)
  * Track starts: Blue=[6,9], Red=[0,6], Green=[8,5], Yellow=[14,8]
  */
-function getGlobalPosition(relativePos: number, playerIndex: number): number {
-    // Blue=0, Red=1, Green=2, Yellow=3
-    // CW Track offsets
-    const startOffsets = [0, 13, 26, 39];
-    return (relativePos + startOffsets[playerIndex]) % 52;
+export function getGlobalPosition(relativePos: number, playerIndex: number): number {
+    return (relativePos + START_OFFSETS[playerIndex]) % TRACK_LENGTH;
 }
 
 /**
@@ -202,7 +204,7 @@ function isPathBlocked(state: LudoState, playerIndex: number, currentPos: number
         const nextRelativePos = currentPos + i;
 
         // Home stretch is always safe/not blockable by opponents
-        if (nextRelativePos >= 52) continue;
+        if (nextRelativePos >= HOME_START) continue;
 
         const globalPos = getGlobalPosition(nextRelativePos, playerIndex);
 
@@ -231,8 +233,38 @@ function isPathBlocked(state: LudoState, playerIndex: number, currentPos: number
  * Check if a global position is a safe cell (no captures allowed)
  * Safe cells are: starting positions and star cells
  */
-function isSafeCell(globalPos: number): boolean {
-    const safeCells = [0, 8, 13, 21, 26, 34, 39, 47];
-    return safeCells.includes(globalPos);
+export function isSafeCell(globalPos: number): boolean {
+    return SAFE_CELLS.includes(globalPos);
+}
+
+/**
+ * Compute the next position using canonical Ludo rules.
+ * - Track positions: 0..51 (relative to player start)
+ * - Home lane: 52..57
+ * - Finish: 58
+ */
+export function computeNextPosition(currentPos: number, diceValue: number): number | null {
+    if (currentPos === FINISH_POS) return null;
+
+    if (currentPos === -1) {
+        return diceValue === 6 ? 0 : null;
+    }
+
+    if (currentPos >= 0 && currentPos <= DOOR_INDEX) {
+        const stepsToDoor = DOOR_INDEX - currentPos;
+        if (diceValue <= stepsToDoor) {
+            return currentPos + diceValue;
+        }
+        const remaining = diceValue - stepsToDoor - 1;
+        const nextPos = HOME_START + remaining;
+        return nextPos > FINISH_POS ? null : nextPos;
+    }
+
+    if (currentPos >= HOME_START && currentPos <= HOME_END) {
+        const nextPos = currentPos + diceValue;
+        return nextPos > FINISH_POS ? null : nextPos;
+    }
+
+    return null;
 }
 

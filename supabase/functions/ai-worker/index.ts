@@ -11,6 +11,33 @@ const corsHeaders = {
 };
 
 // Ludo AI logic (simple random valid move selection)
+const HOME_START = 52;
+const HOME_END = 57;
+const FINISH_POS = 58;
+const DOOR_INDEX = 51;
+
+function computeNextPosition(currentPos: number, diceValue: number): number | null {
+    if (currentPos === FINISH_POS) return null;
+    if (currentPos === -1) return diceValue === 6 ? 0 : null;
+
+    if (currentPos >= 0 && currentPos <= DOOR_INDEX) {
+        const stepsToDoor = DOOR_INDEX - currentPos;
+        if (diceValue <= stepsToDoor) {
+            return currentPos + diceValue;
+        }
+        const remaining = diceValue - stepsToDoor - 1;
+        const nextPos = HOME_START + remaining;
+        return nextPos > FINISH_POS ? null : nextPos;
+    }
+
+    if (currentPos >= HOME_START && currentPos <= HOME_END) {
+        const nextPos = currentPos + diceValue;
+        return nextPos > FINISH_POS ? null : nextPos;
+    }
+
+    return null;
+}
+
 function selectLudoAIMove(state: Record<string, unknown>, currentSeat: number, diceValue: number): number | null {
     const tokens = state.tokens as Array<{ id: number; color: string; position: number }> | undefined;
     if (!tokens) return null;
@@ -32,11 +59,10 @@ function selectLudoAIMove(state: Record<string, unknown>, currentSeat: number, d
         }
 
         // Token already finished
-        if (token.position >= 57) continue;
+        if (token.position >= FINISH_POS) continue;
 
-        // Check if move would exceed finish line
-        const newPos = token.position + diceValue;
-        if (newPos <= 57) {
+        const newPos = computeNextPosition(token.position, diceValue);
+        if (newPos !== null) {
             validTokenIds.push(token.id);
         }
     }

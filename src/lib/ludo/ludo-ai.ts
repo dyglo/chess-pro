@@ -1,4 +1,4 @@
-import { LudoState, getValidMoves } from "./ludo-state";
+import { LudoState, getValidMoves, computeNextPosition, getGlobalPosition, isSafeCell } from "./ludo-state";
 
 export function getBestMove(state: LudoState, diceValue: number): number | null {
     const validTokenIds = getValidMoves(state, diceValue);
@@ -24,8 +24,8 @@ function calculateMoveScore(state: LudoState, tokenId: number, diceValue: number
     }
 
     // 2. Prioritize killing an opponent
-    const nextPos = token.position + diceValue;
-    if (nextPos < 52) {
+    const nextPos = computeNextPosition(token.position, diceValue);
+    if (nextPos !== null && nextPos < 52) {
         const globalPos = getGlobalPosition(nextPos, token.playerIndex);
         const opponentAtPos = state.tokens.find(t =>
             t.playerIndex !== token.playerIndex &&
@@ -38,7 +38,7 @@ function calculateMoveScore(state: LudoState, tokenId: number, diceValue: number
     }
 
     // 3. Prioritize reaching home stretch and finishing
-    if (nextPos >= 52) {
+    if (nextPos !== null && nextPos >= 52) {
         score += 50 + (nextPos - 52) * 5;
     }
 
@@ -55,12 +55,3 @@ function calculateMoveScore(state: LudoState, tokenId: number, diceValue: number
     return score;
 }
 
-function getGlobalPosition(relativePos: number, playerIndex: number): number {
-    const startOffsets = [0, 13, 26, 39];
-    return (relativePos + startOffsets[playerIndex]) % 52;
-}
-
-function isSafeCell(globalPos: number): boolean {
-    const safeCells = [0, 8, 13, 21, 26, 34, 39, 47];
-    return safeCells.includes(globalPos);
-}

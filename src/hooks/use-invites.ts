@@ -66,8 +66,9 @@ export function useNotifications(options: UseNotificationsOptions) {
             if (error) throw error;
 
             const notifs = (data ?? []) as Notification[];
-            setNotifications(notifs);
-            setUnreadCount(notifs.filter((n) => !n.read_at).length);
+            const unread = notifs.filter((n) => !n.read_at);
+            setNotifications(unread);
+            setUnreadCount(unread.length);
         } catch (err) {
             console.error("[Notifications] Fetch error:", err);
         }
@@ -100,6 +101,22 @@ export function useNotifications(options: UseNotificationsOptions) {
                     onNewNotification?.(notif);
                 }
             )
+            .on(
+                "postgres_changes",
+                {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "notifications",
+                    filter: `user_id=eq.${userId}`,
+                },
+                (payload) => {
+                    const updated = payload.new as Notification;
+                    if (updated.read_at) {
+                        setNotifications((prev) => prev.filter((n) => n.id !== updated.id));
+                        setUnreadCount((prev) => Math.max(0, prev - 1));
+                    }
+                }
+            )
             .subscribe();
 
         channelRef.current = channel;
@@ -117,11 +134,7 @@ export function useNotifications(options: UseNotificationsOptions) {
             .eq("id", notificationId);
 
         if (!error) {
-            setNotifications((prev) =>
-                prev.map((n) =>
-                    n.id === notificationId ? { ...n, read_at: new Date().toISOString() } : n
-                )
-            );
+            setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
             setUnreadCount((prev) => Math.max(0, prev - 1));
         }
     }, [supabase]);
@@ -137,9 +150,7 @@ export function useNotifications(options: UseNotificationsOptions) {
             .in("id", unreadIds);
 
         if (!error) {
-            setNotifications((prev) =>
-                prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
-            );
+            setNotifications([]);
             setUnreadCount(0);
         }
     }, [notifications, supabase]);
@@ -296,6 +307,15 @@ export function useMatchInvites(options: UseMatchInvitesOptions) {
             // Remove from pending
             setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
 
+            if (userId) {
+                await supabase
+                    .from("notifications")
+                    .update({ read_at: new Date().toISOString() })
+                    .eq("user_id", userId)
+                    .eq("type", "match_invite")
+                    .contains("payload", { inviteId });
+            }
+
             return {
                 success: true,
                 matchId: (data as { matchId?: string })?.matchId,
@@ -305,7 +325,7 @@ export function useMatchInvites(options: UseMatchInvitesOptions) {
             console.error("[MatchInvites] Accept error:", err);
             return { success: false, error: (err as Error).message };
         }
-    }, [supabase]);
+    }, [supabase, userId]);
 
     // Decline invite
     const declineInvite = useCallback(async (inviteId: string) => {
