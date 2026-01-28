@@ -58,6 +58,11 @@ export interface MatchRosterRow {
   country?: string | null;
 }
 
+type MatchParticipation = {
+  match_id: string;
+  status: "joined" | "pending" | "left" | "kicked";
+};
+
 async function fetchProfilesByIds(ids: string[]) {
   if (ids.length === 0) return [];
   const supabase = createClient();
@@ -74,6 +79,7 @@ export function useMatchRequests() {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [ludoSessions, setLudoSessions] = useState<LudoSessionRow[]>([]);
   const [matchRosters, setMatchRosters] = useState<Record<string, MatchRosterRow[]>>({});
+  const [matchParticipation, setMatchParticipation] = useState<Record<string, MatchParticipation["status"]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const rosterCacheRef = useRef<Record<string, MatchRosterRow[]>>({});
@@ -165,8 +171,51 @@ export function useMatchRequests() {
         console.error("Error fetching matches:", matchError.message, matchError.code);
         throw new Error(`Matches error: ${matchError.message}`);
       }
-      setMatches(matchRows ?? []);
-      const ludoMatchIds = (matchRows ?? [])
+      const { data: participationRows, error: participationError } = await supabase
+        .from("match_players")
+        .select("match_id, status")
+        .eq("user_id", user.id);
+
+      if (participationError) {
+        console.error("Error fetching match participation:", participationError);
+        throw new Error(`Match participation error: ${participationError.message}`);
+      }
+
+      const participationMap: Record<string, MatchParticipation["status"]> = {};
+      const participantMatchIds = Array.from(
+        new Set(
+          (participationRows ?? [])
+            .filter((row) => row.status !== "kicked")
+            .map((row) => {
+              participationMap[row.match_id] = row.status;
+              return row.match_id;
+            })
+        )
+      );
+      setMatchParticipation(participationMap);
+
+      let participantMatches: MatchRow[] = [];
+      if (participantMatchIds.length > 0) {
+        const { data: participantMatchRows, error: participantMatchError } = await supabase
+          .from("matches")
+          .select("id, status, game_type, created_at, started_at, ended_at")
+          .in("id", participantMatchIds)
+          .eq("status", "active");
+
+        if (participantMatchError) {
+          console.error("Error fetching participant matches:", participantMatchError);
+          throw new Error(`Participant matches error: ${participantMatchError.message}`);
+        }
+        participantMatches = participantMatchRows ?? [];
+      }
+
+      const mergedMatches = new Map<string, MatchRow>();
+      (matchRows ?? []).forEach((m) => mergedMatches.set(m.id, m));
+      participantMatches.forEach((m) => mergedMatches.set(m.id, { ...mergedMatches.get(m.id), ...m }));
+      const mergedMatchRows = Array.from(mergedMatches.values());
+
+      setMatches(mergedMatchRows);
+      const ludoMatchIds = mergedMatchRows
         .filter((match) => match.game_type === "ludo")
         .map((match) => match.id);
       await fetchMatchRosters(ludoMatchIds);
@@ -371,6 +420,7 @@ export function useMatchRequests() {
     pendingIncoming,
     pendingOutgoing,
     matchRosters,
+    matchParticipation,
     fetchMatchRosters,
     isLoading,
     error,

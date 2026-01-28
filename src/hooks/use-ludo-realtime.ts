@@ -49,6 +49,7 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
     const [localError, setLocalError] = useState<string | null>(null);
 
     const prevWinnerRef = useRef<number | null>(null);
+    const statusRef = useRef<"joined" | "left" | null>(null);
 
     // Use the unified realtime state hook
     const {
@@ -258,6 +259,38 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
             setIsSubmitting(false);
         }
     }, [match, isMyTurn, isSubmitting, matchId, version, supabase, refresh]);
+
+    // Track player status for leave/rejoin
+    useEffect(() => {
+        if (!matchId || !userId) return;
+
+        const setStatus = async (status: "joined" | "left") => {
+            if (statusRef.current === status) return;
+            statusRef.current = status;
+            const { error } = await supabase.rpc("set_match_player_status", {
+                p_match_id: matchId,
+                p_status: status,
+            });
+            if (error) {
+                console.error("[LudoRealtime] Status update error:", error.message, error.code);
+            }
+        };
+
+        setStatus("joined");
+
+        const handlePageHide = () => {
+            setStatus("left");
+        };
+
+        window.addEventListener("pagehide", handlePageHide);
+        window.addEventListener("beforeunload", handlePageHide);
+
+        return () => {
+            handlePageHide();
+            window.removeEventListener("pagehide", handlePageHide);
+            window.removeEventListener("beforeunload", handlePageHide);
+        };
+    }, [matchId, userId, supabase]);
 
     // Auto-skip pending seats deterministically
     useEffect(() => {

@@ -28,7 +28,7 @@ type PresenceRow = {
 export default function FriendsPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
-  const { pendingIncoming, pendingOutgoing, activeMatches, activeLudoSessions, sendRequest, acceptRequest, declineRequest } =
+  const { pendingIncoming, pendingOutgoing, activeMatches, activeLudoSessions, matchParticipation, sendRequest, acceptRequest, declineRequest } =
     useMatchRequests();
   const { pendingInvites, createMatchAndInvite, acceptInvite, declineInvite } = useMatchInvites({ userId: user?.id });
   const { notifications, markAsRead } = useNotifications({ userId: user?.id });
@@ -103,6 +103,10 @@ export default function FriendsPage() {
   const matchStartedNotifs = useMemo(() => {
     return (notifications ?? []).filter((n) => n.type === "match_started" && !n.read_at);
   }, [notifications]);
+
+  const leftActiveMatches = useMemo(() => {
+    return activeMatches.filter((match) => matchParticipation[match.id] === "left");
+  }, [activeMatches, matchParticipation]);
 
   const handleJoinStartedMatch = async (notifId: string, payload: Record<string, unknown>) => {
     const matchId = payload.matchId as string | undefined;
@@ -214,6 +218,37 @@ export default function FriendsPage() {
                   className="rounded-full bg-purple-600 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-110"
                 >
                   Join Game
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {leftActiveMatches.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {leftActiveMatches.map((match) => (
+              <div
+                key={`resume-${match.id}`}
+                className="flex flex-col gap-3 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-500">
+                    Match In Progress
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-amber-900">
+                    {match.game_type === "ludo" ? "Your Ludo match is live." : "Your chess match is live."}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (match.game_type === "ludo") {
+                      router.push(`/games/ludo?match=${match.id}&multiplayer=true`);
+                    } else {
+                      router.push(`/match/${match.id}`);
+                    }
+                  }}
+                  className="rounded-full bg-amber-600 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-110"
+                >
+                  Resume
                 </button>
               </div>
             ))}
@@ -474,7 +509,7 @@ export default function FriendsPage() {
                   </div>
                 ))}
 
-                {/* Chess Matches */}
+                {/* Active Matches */}
                 {activeMatches.map((match) => (
                   <div key={match.id} className="relative group">
                     <button
@@ -490,18 +525,24 @@ export default function FriendsPage() {
                     </button>
                     <Link
                       id={`match-${match.id}`}
-                      href={`/match/${match.id}`}
-                      className="flex items-center justify-between rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
+                      href={match.game_type === "ludo" ? `/games/ludo?match=${match.id}&multiplayer=true` : `/match/${match.id}`}
+                      className={`flex items-center justify-between rounded-3xl border px-4 py-3 text-sm font-semibold transition hover:-translate-y-0.5 ${match.game_type === "ludo"
+                          ? "border-purple-200 bg-purple-50"
+                          : "border-[var(--line)] bg-[var(--surface-2)]"
+                        }`}
                     >
                       <div className="flex flex-col">
-                        <span>♟ Match #{match.id.slice(0, 4)}</span>
-                        <span className="text-xs font-normal text-[var(--muted)]">
+                        <span>{match.game_type === "ludo" ? "🎲 Ludo Match" : `♟ Match #${match.id.slice(0, 4)}`}</span>
+                        <span className={`text-xs font-normal ${match.game_type === "ludo" ? "text-purple-700/75" : "text-[var(--muted)]"}`}>
                           {match.created_at ? new Date(match.created_at).toLocaleString(undefined, {
                             month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                           }) : 'Just now'}
                         </span>
                       </div>
-                      <span className="rounded-full bg-white/50 px-2 py-1 text-xs font-bold text-[var(--foreground)]">Join</span>
+                      <span className={`rounded-full px-2 py-1 text-xs font-bold ${match.game_type === "ludo"
+                          ? "bg-white/50 text-purple-700"
+                          : "bg-white/50 text-[var(--foreground)]"
+                        }`}>Join</span>
                     </Link>
                   </div>
                 ))}
