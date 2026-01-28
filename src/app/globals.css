@@ -50,3 +50,62 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+@keyframes ludoKnockFlash {
+  0% { filter: brightness(1); transform: scale(1); }
+  40% { filter: brightness(1.4); transform: scale(1.08); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes ludoCaptureRing {
+  0% { opacity: 0.9; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes ludoCaptureBurst {
+  0% { opacity: 0.8; transform: scale(0.7); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+.ludo-knock-flash {
+  animation: ludoKnockFlash 280ms ease-out;
+  transform-origin: center;
+}
+
+.ludo-capture-ring {
+  animation: ludoCaptureRing 420ms ease-out;
+  transform-origin: center;
+}
+
+.ludo-capture-burst {
+  animation: ludoCaptureBurst 360ms ease-out;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ludo-knock-flash,
+  .ludo-capture-ring,
+  .ludo-capture-burst {
+    animation: none;
+  }
+}
+
+/* Ludo Dark Mode Scoped Variables */
+/* Ludo Dark Mode Scoped Variables */
+.ludo-root {
+  --ludo-bg-card: #ffffff;
+  --ludo-bg-card-active: #ffffff;
+  --ludo-border-card: #f3f4f6;
+  --ludo-text-primary: #1a1a1a;
+  --ludo-text-secondary: #6b7280;
+  --ludo-text-muted: #9ca3af;
+}
+
+.ludo-root.ludo-dark {
+  --ludo-bg-card: #18181b;
+  --ludo-bg-card-active: #27272a;
+  --ludo-border-card: #27272a;
+  --ludo-text-primary: #f4f4f5;
+  --ludo-text-secondary: #a1a1aa;
+  --ludo-text-muted: #52525b;
+}

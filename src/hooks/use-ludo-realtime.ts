@@ -47,9 +47,12 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [logs, setLogs] = useState<string[]>(["Joined multiplayer game."]);
     const [localError, setLocalError] = useState<string | null>(null);
+    const [captureEffect, setCaptureEffect] = useState<{ globalPos: number; color: PlayerColor } | null>(null);
+    const [knockedTokenIds, setKnockedTokenIds] = useState<number[]>([]);
 
     const prevWinnerRef = useRef<number | null>(null);
     const statusRef = useRef<"joined" | "left" | null>(null);
+    const captureTimeoutRef = useRef<number | null>(null);
 
     // Use the unified realtime state hook
     const {
@@ -142,6 +145,26 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
                 break;
 
             case "ludo_move":
+                {
+                    const knocked = (event.payload.knockedTokens as Array<{ tokenId?: number }> | undefined) ?? [];
+                    if (knocked.length > 0) {
+                        const seat = (event.payload.seat as number | undefined) ?? 0;
+                        const toPos = (event.payload.to as number | undefined) ?? -1;
+                        if (toPos >= 0 && toPos < 52) {
+                            const startOffsets = [0, 13, 26, 39];
+                            const globalPos = (toPos + startOffsets[seat]) % 52;
+                            setCaptureEffect({ globalPos, color: PLAYER_COLORS[seat] });
+                        }
+                        setKnockedTokenIds(knocked.map((k) => k.tokenId).filter((id): id is number => typeof id === "number"));
+                        if (captureTimeoutRef.current) {
+                            window.clearTimeout(captureTimeoutRef.current);
+                        }
+                        captureTimeoutRef.current = window.setTimeout(() => {
+                            setCaptureEffect(null);
+                            setKnockedTokenIds([]);
+                        }, 500);
+                    }
+                }
                 if (event.payload.winner !== null) {
                     const winnerSeat = event.payload.winner as number;
                     const winnerName = players[winnerSeat]?.is_ai
@@ -331,6 +354,14 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
         }
     }, [gameState.winner, onGameEnd]);
 
+    useEffect(() => {
+        return () => {
+            if (captureTimeoutRef.current) {
+                window.clearTimeout(captureTimeoutRef.current);
+            }
+        };
+    }, []);
+
     // Get enhanced player info
     const getPlayers = useCallback((): LudoPlayer[] => {
         return players.map((p) => ({
@@ -358,6 +389,8 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
         handleTokenMove,
         getPlayers,
         addLog,
+        captureEffect,
+        knockedTokenIds,
         isCurrentPlayerAi: gameState.players[gameState.currentPlayerIndex]?.isAi ?? false,
         isMyTurn,
         error: localError || realtimeError,

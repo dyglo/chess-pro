@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Plus, Settings, HelpCircle, Menu, X, Users } from "lucide-react";
 import { LudoSettingsModal } from "@/components/play/ludo-settings-modal";
 import { defaultLudoStyle, getLudoStyleById } from "@/lib/ludo/board-styles";
+import { LudoThemeToggle } from "./components/theme-toggle";
 
 export default function LudoPage() {
     return (
@@ -32,7 +33,7 @@ function LudoGameContent() {
     const { user, signOut } = useAuth();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get("session");
-    const matchId = searchParams.get("match"); // New: match ID for realtime mode
+    const matchId = searchParams.get("match");
     const isMultiplayer = searchParams.get("multiplayer") === "true";
 
     const [userProfile, setUserProfile] = useState<{
@@ -45,20 +46,46 @@ function LudoGameContent() {
     const [showSettings, setShowSettings] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [boardStyleId, setBoardStyleId] = useState(defaultLudoStyle.id);
+    const [isDarkMode, setIsDarkMode] = useState(false);
 
     useEffect(() => {
         const savedStyle = localStorage.getItem("ludo-board-style");
         if (savedStyle) {
             setBoardStyleId(savedStyle);
         }
+
+        const savedTheme = localStorage.getItem("ludo-theme");
+        if (savedTheme === "dark") {
+            setIsDarkMode(true);
+        }
     }, []);
+
+    const toggleTheme = () => {
+        const newMode = !isDarkMode;
+        setIsDarkMode(newMode);
+        localStorage.setItem("ludo-theme", newMode ? "dark" : "light");
+    };
 
     const handleStyleChange = (id: string) => {
         setBoardStyleId(id);
         localStorage.setItem("ludo-board-style", id);
     };
 
-    const boardStyle = getLudoStyleById(boardStyleId);
+    const baseBoardStyle = getLudoStyleById(boardStyleId);
+
+    // Apply Dark Mode overrides for Classic style
+    const boardStyle = React.useMemo(() => {
+        if (isDarkMode && baseBoardStyle.id === 'classic') {
+            return {
+                ...baseBoardStyle,
+                background: "#18181b", // zinc-900
+                boardFill: "#27272a", // zinc-800
+                gridStroke: "#3f3f46", // zinc-700
+                safeSquareColor: "#3f3f46",
+            };
+        }
+        return baseBoardStyle;
+    }, [isDarkMode, baseBoardStyle]);
 
     // Fetch user profile
     useEffect(() => {
@@ -86,7 +113,7 @@ function LudoGameContent() {
             console.log("Game ended, winner:", winner);
         },
         existingSessionId: sessionId,
-        isMultiplayer: isMultiplayer && !matchId, // Use legacy only if no matchId
+        isMultiplayer: isMultiplayer && !matchId,
     });
 
     // New realtime hook for multiplayer with matchId
@@ -108,22 +135,21 @@ function LudoGameContent() {
         handleTokenMove,
         newGame,
         isCurrentPlayerAi,
-    } = useRealtimeMode ? { ...realtimeGame } : { ...legacyGame };
+        captureEffect,
+        knockedTokenIds,
+    } = useRealtimeMode ? { ...realtimeGame } : { ...legacyGame, captureEffect: null, knockedTokenIds: [] };
 
     // Get display name for player
     const getPlayerName = (playerIndex: number) => {
-        // In local/single player, Player 0 is always the current user
         if (!isMultiplayer && playerIndex === 0) {
             return userProfile?.full_name || userProfile?.username || user?.email?.split("@")[0] || "Guest";
         }
-        // In multiplayer, respect the state hydrated from DB
         return state.players[playerIndex].name;
     };
 
     const players = state.players.map((p, idx) => ({
         ...p,
         name: getPlayerName(idx),
-        // Only override P0 avatar/country if single player. In multiplayer, use state.
         avatarUrl: (!isMultiplayer && idx === 0) ? (userProfile?.avatar_url || undefined) : (p.avatarUrl || undefined),
         country: (!isMultiplayer && idx === 0) ? (userProfile?.country || getAICountry(idx)) : (p.country || getAICountry(idx)),
     }));
@@ -151,7 +177,10 @@ function LudoGameContent() {
     });
 
     return (
-        <div className="h-screen bg-[#F8F9FA] flex flex-col font-sans text-[var(--foreground)] selection:bg-[var(--accent)]/20 overflow-hidden">
+        <div className={cn(
+            "h-screen flex flex-col font-sans text-[var(--ludo-text-primary)] selection:bg-[var(--accent)]/20 overflow-hidden ludo-root",
+            isDarkMode ? "ludo-dark bg-zinc-950" : "bg-[#F8F9FA]"
+        )}>
             {/* Header */}
             <header className="h-14 flex items-center justify-between px-4 lg:px-8 border-b border-gray-100 bg-white/80 backdrop-blur-md flex-shrink-0">
                 <Link href="/" className="flex items-center gap-2 group">
@@ -226,9 +255,9 @@ function LudoGameContent() {
                             />
 
                             {/* Action Panel with Dice */}
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
+                            <div className="bg-[var(--ludo-bg-card)] rounded-xl shadow-sm border border-[var(--ludo-border-card)] p-4 space-y-4 transition-colors duration-300">
                                 {/* Dice */}
-                                <div className="py-2 border-b border-gray-100">
+                                <div className="py-2 border-b border-[var(--ludo-border-card)]">
                                     <LudoDice
                                         value={state.diceValue}
                                         isRolling={isRolling}
@@ -241,22 +270,27 @@ function LudoGameContent() {
                                 <div className="space-y-1">
                                     <button
                                         onClick={newGame}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--ludo-border-card)] transition-colors text-left group"
                                     >
-                                        <Plus className="w-4 h-4 text-gray-400" />
-                                        <span className="text-xs font-semibold">New Game</span>
+                                        <Plus className="w-4 h-4 text-[var(--ludo-text-muted)] group-hover:text-[var(--ludo-text-secondary)]" />
+                                        <span className="text-xs font-semibold text-[var(--ludo-text-secondary)] group-hover:text-[var(--ludo-text-primary)]">New Game</span>
                                     </button>
                                     <button
                                         onClick={() => setShowSettings(true)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--ludo-border-card)] transition-colors text-left group"
                                     >
-                                        <Settings className="w-4 h-4 text-gray-400" />
-                                        <span className="text-xs font-semibold">Settings</span>
+                                        <Settings className="w-4 h-4 text-[var(--ludo-text-muted)] group-hover:text-[var(--ludo-text-secondary)]" />
+                                        <span className="text-xs font-semibold text-[var(--ludo-text-secondary)] group-hover:text-[var(--ludo-text-primary)]">Settings</span>
                                     </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left">
-                                        <HelpCircle className="w-4 h-4 text-gray-400" />
-                                        <span className="text-xs font-semibold">How to Play</span>
+                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--ludo-border-card)] transition-colors text-left group">
+                                        <HelpCircle className="w-4 h-4 text-[var(--ludo-text-muted)] group-hover:text-[var(--ludo-text-secondary)]" />
+                                        <span className="text-xs font-semibold text-[var(--ludo-text-secondary)] group-hover:text-[var(--ludo-text-primary)]">How to Play</span>
                                     </button>
+                                </div>
+
+                                {/* Theme Toggle */}
+                                <div className="border-t border-[var(--ludo-border-card)] pt-2">
+                                    <LudoThemeToggle isDark={isDarkMode} onToggle={toggleTheme} />
                                 </div>
                             </div>
 
@@ -299,6 +333,8 @@ function LudoGameContent() {
                                     validMoveTokenIds={validMoveTokenIds}
                                     onTokenClick={handleTokenMove}
                                     style={boardStyle}
+                                    captureEffect={captureEffect}
+                                    knockedTokenIds={knockedTokenIds}
                                 />
                             </div>
 
@@ -328,8 +364,8 @@ function LudoGameContent() {
                         <div className="flex flex-col gap-3 h-full justify-center">
 
                             {/* Turn Indicator */}
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                                <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+                            <div className="bg-[var(--ludo-bg-card)] rounded-xl shadow-sm border border-[var(--ludo-border-card)] p-4 transition-colors duration-300">
+                                <div className="text-xs font-bold uppercase tracking-widest text-[var(--ludo-text-muted)] mb-2">
                                     Current Turn
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -340,12 +376,12 @@ function LudoGameContent() {
                                         state.currentPlayerIndex === 2 && "bg-green-500",
                                         state.currentPlayerIndex === 3 && "bg-yellow-500"
                                     )} />
-                                    <span className="text-sm font-semibold">
+                                    <span className="text-sm font-semibold text-[var(--ludo-text-primary)]">
                                         {normalizedPlayers[state.currentPlayerIndex]?.name || "Player"}
                                     </span>
                                 </div>
                                 {isCurrentPlayerAi && (
-                                    <div className="text-xs text-gray-400 mt-1">AI thinking...</div>
+                                    <div className="text-xs text-[var(--ludo-text-muted)] mt-1">AI thinking...</div>
                                 )}
                             </div>
 
@@ -382,6 +418,8 @@ function LudoGameContent() {
                                 validMoveTokenIds={validMoveTokenIds}
                                 onTokenClick={handleTokenMove}
                                 style={boardStyle}
+                                captureEffect={captureEffect}
+                                knockedTokenIds={knockedTokenIds}
                             />
                         </div>
 

@@ -11,9 +11,19 @@ interface LudoBoardProps {
     onTokenClick?: (tokenId: number) => void;
     validMoveTokenIds?: number[];
     style?: LudoBoardStyle;
+    captureEffect?: { globalPos: number; color: PlayerColor } | null;
+    knockedTokenIds?: number[];
 }
 
-export function LudoBoard({ className, tokens, onTokenClick, validMoveTokenIds = [], style = defaultLudoStyle }: LudoBoardProps) {
+export function LudoBoard({
+    className,
+    tokens,
+    onTokenClick,
+    validMoveTokenIds = [],
+    style = defaultLudoStyle,
+    captureEffect = null,
+    knockedTokenIds = [],
+}: LudoBoardProps) {
     const BOARD_SIZE = 450;
     const CELL_SIZE = BOARD_SIZE / 15;
     const TOKEN_RADIUS = CELL_SIZE * 0.35;
@@ -90,11 +100,20 @@ export function LudoBoard({ className, tokens, onTokenClick, validMoveTokenIds =
         const centerX = x * CELL_SIZE + CELL_SIZE / 2;
         const centerY = y * CELL_SIZE + CELL_SIZE / 2;
         const isClickable = validMoveTokenIds.includes(token.id);
+        const isKnocked = knockedTokenIds.includes(token.id);
 
         return (
             <g key={token.id} onClick={() => isClickable && onTokenClick?.(token.id)} className={cn("transition-all duration-300 cursor-pointer", isClickable ? "opacity-100" : "opacity-90")}>
                 <ellipse cx={centerX} cy={centerY + 2} rx={TOKEN_RADIUS} ry={TOKEN_RADIUS * 0.5} fill="rgba(0,0,0,0.2)" />
-                <circle cx={centerX} cy={centerY} r={TOKEN_RADIUS} fill={`url(#grad-${token.color})`} stroke="white" strokeWidth={2} className={cn(isClickable && "animate-pulse")} />
+                <circle
+                    cx={centerX}
+                    cy={centerY}
+                    r={TOKEN_RADIUS}
+                    fill={`url(#grad-${token.color})`}
+                    stroke="white"
+                    strokeWidth={2}
+                    className={cn(isClickable && "animate-pulse", isKnocked && "ludo-knock-flash")}
+                />
                 <circle cx={centerX - TOKEN_RADIUS * 0.2} cy={centerY - TOKEN_RADIUS * 0.2} r={TOKEN_RADIUS * 0.3} fill="white" opacity={0.4} />
                 {isClickable && <circle cx={centerX} cy={centerY} r={TOKEN_RADIUS + 4} fill="none" stroke={`url(#grad-${token.color})`} strokeWidth={2} className="animate-ping" opacity={0.6} />}
             </g>
@@ -140,6 +159,20 @@ export function LudoBoard({ className, tokens, onTokenClick, validMoveTokenIds =
                         </g>
                     );
                 }))}
+                {captureEffect && (
+                    (() => {
+                        const [x, y] = getCellCoords(captureEffect.globalPos);
+                        const centerX = x * CELL_SIZE + CELL_SIZE / 2;
+                        const centerY = y * CELL_SIZE + CELL_SIZE / 2;
+                        const ringColor = style.trackColors[captureEffect.color];
+                        return (
+                            <g className="ludo-capture-burst">
+                                <circle cx={centerX} cy={centerY} r={TOKEN_RADIUS * 0.6} fill={ringColor} opacity={0.2} />
+                                <circle cx={centerX} cy={centerY} r={TOKEN_RADIUS * 1.8} fill="none" stroke={ringColor} strokeWidth={3} className="ludo-capture-ring" />
+                            </g>
+                        );
+                    })()
+                )}
                 {tokens.map(renderToken)}
             </svg>
         </div>
