@@ -112,14 +112,25 @@ export function useMatchChat(matchId?: string, userId?: string) {
     if (!matchId || !userId) return { success: false, error: "Not ready" };
     const trimmed = content.trim();
     if (!trimmed) return { success: false, error: "Empty message" };
-    const { error: insertError } = await supabase
+    const { data, error: insertError } = await supabase
       .from("match_messages")
-      .insert({ match_id: matchId, user_id: userId, content: trimmed });
+      .insert({ match_id: matchId, user_id: userId, content: trimmed })
+      .select("id, match_id, user_id, content, created_at")
+      .single();
     if (insertError) {
+      setError(insertError.message);
       return { success: false, error: insertError.message };
     }
+    if (data) {
+      await hydrateProfiles([data.user_id]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === data.id)) return prev;
+        const enriched = mergeProfiles([data as MatchChatMessage])[0];
+        return [...prev, enriched].slice(-200);
+      });
+    }
     return { success: true };
-  }, [matchId, userId, supabase]);
+  }, [matchId, userId, supabase, hydrateProfiles, mergeProfiles]);
 
   return {
     messages,
