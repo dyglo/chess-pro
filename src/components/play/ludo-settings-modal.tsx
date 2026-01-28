@@ -24,20 +24,20 @@ export function LudoSettingsModal({
             onClick={onClose}
         >
             <div
-                className="bg-white rounded-[2rem] w-full max-w-[360px] overflow-hidden shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border border-gray-100 animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 ease-out"
+                className="bg-[var(--ludo-bg-card)] rounded-[2rem] w-full max-w-[360px] overflow-hidden shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border border-[var(--ludo-border-card)] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 ease-out"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Compact Header */}
-                <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between bg-white">
+                <div className="px-6 py-5 border-b border-[var(--ludo-border-card)] flex items-center justify-between bg-[var(--ludo-bg-card)]">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 tracking-tight">Ludo Settings</h2>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customize Interface</p>
+                        <h2 className="text-lg font-bold text-[var(--ludo-text-primary)] tracking-tight">Ludo Settings</h2>
+                        <p className="text-[10px] text-[var(--ludo-text-muted)] font-bold uppercase tracking-wider">Customize Interface</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 group"
+                        className="p-2 hover:bg-[var(--ludo-border-card)] rounded-full transition-all duration-200 group"
                     >
-                        <X className="w-4 h-4 text-gray-400 group-hover:text-gray-900 transition-all duration-200" />
+                        <X className="w-4 h-4 text-[var(--ludo-text-muted)] group-hover:text-[var(--ludo-text-primary)] transition-all duration-200" />
                     </button>
                 </div>
 
@@ -45,7 +45,7 @@ export function LudoSettingsModal({
                 <div className="p-6 space-y-6">
                     <div>
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Board Style</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--ludo-text-muted)]">Board Style</h3>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
@@ -57,8 +57,8 @@ export function LudoSettingsModal({
                                         type="button"
                                         onClick={() => onStyleChange(style.id)}
                                         className={`group relative flex flex-col items-center p-3 rounded-2xl border-2 transition-all duration-300 text-center hover:border-[var(--accent)]/30 ${isActive
-                                                ? "border-[var(--accent)] bg-[var(--accent)]/[0.02] shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1)]"
-                                                : "border-gray-50 bg-gray-50/30 grayscale-[0.3] hover:grayscale-0"
+                                            ? "border-[var(--accent)] bg-[var(--accent)]/[0.02] shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1)]"
+                                            : "border-[var(--ludo-border-card)] bg-[var(--ludo-border-card)]/30 grayscale-[0.3] hover:grayscale-0"
                                             }`}
                                     >
                                         {/* Simplified Board Preview */}
@@ -81,7 +81,7 @@ export function LudoSettingsModal({
                                             )}
                                         </div>
 
-                                        <p className={`font-bold text-[11px] ${isActive ? "text-[var(--accent)]" : "text-gray-600"}`}>
+                                        <p className={`font-bold text-[11px] ${isActive ? "text-[var(--accent)]" : "text-[var(--ludo-text-secondary)]"}`}>
                                             {style.name}
                                         </p>
                                     </button>

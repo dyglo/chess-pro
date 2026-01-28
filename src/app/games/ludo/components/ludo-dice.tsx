@@ -91,7 +91,7 @@ export function LudoDice({ value, isRolling, onRoll, disabled, className }: Ludo
 
             {/* Result display */}
             {value && !isRolling && (
-                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <div className="text-xs font-bold text-[var(--ludo-text-muted)] uppercase tracking-wider">
                     Rolled: {value}
                 </div>
             )}
