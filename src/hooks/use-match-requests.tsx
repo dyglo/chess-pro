@@ -28,7 +28,7 @@ export interface FriendRequest {
 
 export interface MatchRow {
   id: string;
-  status: "pending" | "active" | "completed" | "cancelled";
+  status: "pending" | "lobby" | "active" | "completed" | "cancelled";
   game_type?: GameType | null;
   white_user_id?: string | null;
   black_user_id?: string | null;
@@ -164,7 +164,7 @@ export function useMatchRequests() {
         .from("matches")
         .select("id, status, game_type, white_user_id, black_user_id, game_id, created_at, started_at, ended_at")
         .or(`white_user_id.eq.${user.id},black_user_id.eq.${user.id}`)
-        .eq("status", "active")
+        .in("status", ["active", "pending", "lobby"])
         .order("created_at", { ascending: false });
 
       if (matchError) {
@@ -200,7 +200,7 @@ export function useMatchRequests() {
           .from("matches")
           .select("id, status, game_type, created_at, started_at, ended_at")
           .in("id", participantMatchIds)
-          .eq("status", "active");
+          .in("status", ["active", "pending", "lobby"]);
 
         if (participantMatchError) {
           console.error("Error fetching participant matches:", participantMatchError);
@@ -406,6 +406,11 @@ export function useMatchRequests() {
     [matches]
   );
 
+  const pendingMatches = useMemo(
+    () => matches.filter((m) => m.status === "pending" || m.status === "lobby"),
+    [matches]
+  );
+
   const activeLudoSessions = useMemo(
     () => ludoSessions.filter((s) => s.status === "playing"),
     [ludoSessions]
@@ -415,6 +420,7 @@ export function useMatchRequests() {
     requests,
     matches,
     activeMatches,
+    pendingMatches,
     ludoSessions,
     activeLudoSessions,
     pendingIncoming,

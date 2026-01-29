@@ -373,6 +373,7 @@ function LudoGameContent() {
                                 isAi={normalizedPlayers[3].isAi}
                                 color="yellow"
                                 isActive={state.currentPlayerIndex === 3}
+                                avatarUrl={normalizedPlayers[3].avatarUrl || undefined}
                                 country={normalizedPlayers[3].country}
                                 finishedCount={finishedByColor.yellow}
                                 status={normalizedPlayers[3].status}
@@ -388,6 +389,7 @@ function LudoGameContent() {
                                     isAi={normalizedPlayers[1].isAi}
                                     color="red"
                                     isActive={state.currentPlayerIndex === 1}
+                                    avatarUrl={normalizedPlayers[1].avatarUrl || undefined}
                                     country={normalizedPlayers[1].country}
                                     finishedCount={finishedByColor.red}
                                     status={normalizedPlayers[1].status}
@@ -398,6 +400,7 @@ function LudoGameContent() {
                                     isAi={normalizedPlayers[2].isAi}
                                     color="green"
                                     isActive={state.currentPlayerIndex === 2}
+                                    avatarUrl={normalizedPlayers[2].avatarUrl || undefined}
                                     country={normalizedPlayers[2].country}
                                     finishedCount={finishedByColor.green}
                                     status={normalizedPlayers[2].status}
@@ -436,6 +439,7 @@ function LudoGameContent() {
                                     isAi={normalizedPlayers[3].isAi}
                                     color="yellow"
                                     isActive={state.currentPlayerIndex === 3}
+                                    avatarUrl={normalizedPlayers[3].avatarUrl || undefined}
                                     country={normalizedPlayers[3].country}
                                     finishedCount={finishedByColor.yellow}
                                     status={normalizedPlayers[3].status}
@@ -501,6 +505,7 @@ function LudoGameContent() {
                                 isAi={normalizedPlayers[1].isAi}
                                 color="red"
                                 isActive={state.currentPlayerIndex === 1}
+                                avatarUrl={normalizedPlayers[1].avatarUrl || undefined}
                                 country={normalizedPlayers[1].country}
                                 finishedCount={finishedByColor.red}
                                 status={normalizedPlayers[1].status}
@@ -579,6 +584,7 @@ function LudoGameContent() {
                                 isAi={normalizedPlayers[3].isAi}
                                 color="yellow"
                                 isActive={state.currentPlayerIndex === 3}
+                                avatarUrl={normalizedPlayers[3].avatarUrl || undefined}
                                 country={normalizedPlayers[3].country}
                                 finishedCount={finishedByColor.yellow}
                                 status={normalizedPlayers[3].status}
@@ -589,6 +595,7 @@ function LudoGameContent() {
                                 isAi={normalizedPlayers[2].isAi}
                                 color="green"
                                 isActive={state.currentPlayerIndex === 2}
+                                avatarUrl={normalizedPlayers[2].avatarUrl || undefined}
                                 country={normalizedPlayers[2].country}
                                 finishedCount={finishedByColor.green}
                                 status={normalizedPlayers[2].status}

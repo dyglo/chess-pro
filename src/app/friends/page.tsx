@@ -28,7 +28,7 @@ type PresenceRow = {
 export default function FriendsPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
-  const { pendingIncoming, pendingOutgoing, activeMatches, activeLudoSessions, matchParticipation, sendRequest, acceptRequest, declineRequest } =
+  const { pendingIncoming, pendingOutgoing, activeMatches, pendingMatches, activeLudoSessions, matchParticipation, sendRequest, acceptRequest, declineRequest } =
     useMatchRequests();
   const { pendingInvites, createMatchAndInvite, acceptInvite, declineInvite } = useMatchInvites({ userId: user?.id });
   const { notifications, markAsRead } = useNotifications({ userId: user?.id });
@@ -107,6 +107,10 @@ export default function FriendsPage() {
   const leftActiveMatches = useMemo(() => {
     return activeMatches.filter((match) => matchParticipation[match.id] === "left");
   }, [activeMatches, matchParticipation]);
+
+  const pendingLobbies = useMemo(() => {
+    return pendingMatches.filter((match) => match.game_type === "ludo");
+  }, [pendingMatches]);
 
   const primaryLiveNotice = useMemo(() => {
     if (matchStartedNotifs.length > 0) {
@@ -305,6 +309,31 @@ export default function FriendsPage() {
                   className="rounded-full bg-amber-600 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-110"
                 >
                   Resume
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {pendingLobbies.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {pendingLobbies.map((match) => (
+              <div
+                key={`lobby-${match.id}`}
+                className="flex flex-col gap-3 rounded-3xl border border-purple-200 bg-purple-50 px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-purple-500">
+                    Lobby Waiting
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-purple-900">
+                    Your Ludo lobby is waiting for players.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push(`/match/${match.id}/lobby?game=ludo`)}
+                  className="rounded-full bg-purple-600 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:brightness-110"
+                >
+                  Resume Lobby
                 </button>
               </div>
             ))}

@@ -224,7 +224,10 @@ export function useLudoRealtime(options: UseLudoRealtimeOptions) {
     const handleTokenMove = useCallback(async (tokenId: number) => {
         if (!match || !isMyTurn || isSubmitting) return;
         if (gameState.diceValue === null) return;
-        if (!validMoveTokenIds.includes(tokenId)) return;
+        if (!validMoveTokenIds.includes(tokenId)) {
+            const refreshedMoves = getValidMoves(gameState, gameState.diceValue);
+            if (!refreshedMoves.includes(tokenId)) return;
+        }
 
         setIsSubmitting(true);
         setLocalError(null);

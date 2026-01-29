@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -31,6 +31,7 @@ export function MatchLobby({ matchId, gameType, embedded = false }: LobbyPagePro
         players,
         isLoading,
         isConnected,
+        refresh,
     } = useRealtimeMatchState({
         matchId,
         userId: user?.id,
@@ -41,10 +42,19 @@ export function MatchLobby({ matchId, gameType, embedded = false }: LobbyPagePro
     const minPlayers = gameType === "chess" ? 2 : 2;
     const maxPlayers = gameType === "chess" ? 2 : 4;
     const canStart = isHost && joinedCount >= minPlayers;
+    const startTimeoutRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (!matchId) return;
+        localStorage.setItem("lastLobbyMatchId", matchId);
+        localStorage.setItem("lastLobbyGameType", gameType);
+    }, [matchId, gameType]);
 
     // Redirect to game if match has started
     useEffect(() => {
         if (match?.status === "active") {
+            setIsStarting(false);
             if (gameType === "ludo") {
                 router.push(`/games/ludo?match=${matchId}&multiplayer=true`);
             } else {
@@ -52,6 +62,22 @@ export function MatchLobby({ matchId, gameType, embedded = false }: LobbyPagePro
             }
         }
     }, [match?.status, matchId, gameType, router]);
+
+    useEffect(() => {
+        if (match?.status === "active" && startTimeoutRef.current) {
+            window.clearTimeout(startTimeoutRef.current);
+            startTimeoutRef.current = null;
+        }
+    }, [match?.status]);
+
+    useEffect(() => {
+        return () => {
+            if (startTimeoutRef.current) {
+                window.clearTimeout(startTimeoutRef.current);
+                startTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     const handleStartGame = async () => {
         if (!canStart) return;
@@ -66,6 +92,12 @@ export function MatchLobby({ matchId, gameType, embedded = false }: LobbyPagePro
 
             if (startError) throw startError;
             // Redirect will happen automatically via the useEffect above
+            if (startTimeoutRef.current) {
+                window.clearTimeout(startTimeoutRef.current);
+            }
+            startTimeoutRef.current = window.setTimeout(() => {
+                refresh();
+            }, 4000);
         } catch (err) {
             console.error("Start error:", err);
             setError((err as Error).message);
@@ -155,6 +187,7 @@ export function MatchLobby({ matchId, gameType, embedded = false }: LobbyPagePro
                             const seatColor = SEAT_COLORS[seatIndex];
                             const displayName = player?.display_name || player?.username || (player?.is_ai ? `AI ${seatIndex + 1}` : `Player ${seatIndex + 1}`);
                             const avatarUrl = player?.avatar_url || "/avatars/user-placeholder.jpg";
+                            const country = player?.country || "Global";
 
                             return (
                                 <div
@@ -201,8 +234,8 @@ export function MatchLobby({ matchId, gameType, embedded = false }: LobbyPagePro
                                             <span className="text-sm text-gray-400">Empty seat</span>
                                         )}
                                         <p className="text-xs text-gray-400">
-                                            {player?.status === "joined" && "Ready"}
-                                            {player?.status === "pending" && "Invited • Waiting..."}
+                                            {player?.status === "joined" && `Ready • ${country}`}
+                                            {player?.status === "pending" && `Invited • Waiting... • ${country}`}
                                             {!player && "Open"}
                                         </p>
                                     </div>
