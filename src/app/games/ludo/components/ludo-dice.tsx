@@ -22,7 +22,7 @@ const PIP_POSITIONS: Record<number, [number, number][]> = {
 };
 
 export function LudoDice({ value, isRolling, onRoll, disabled, className }: LudoDiceProps) {
-    const [rollingValue, setRollingValue] = useState<number>(1);
+    const [rollingValue, setRollingValue] = useState<number>(() => Math.floor(Math.random() * 6) + 1);
 
     // Animate through random values while rolling
     useEffect(() => {
@@ -34,8 +34,8 @@ export function LudoDice({ value, isRolling, onRoll, disabled, className }: Ludo
         }
     }, [isRolling]);
 
-    const currentDisplayValue = isRolling ? rollingValue : (value || 1);
-    const pips = PIP_POSITIONS[currentDisplayValue] || PIP_POSITIONS[1];
+    const currentDisplayValue = isRolling ? rollingValue : (value ?? null);
+    const pips = currentDisplayValue ? (PIP_POSITIONS[currentDisplayValue] || []) : [];
 
     return (
         <div className={cn("flex flex-col items-center gap-3", className)}>
@@ -69,6 +69,11 @@ export function LudoDice({ value, isRolling, onRoll, disabled, className }: Ludo
                         />
                     ))}
                 </svg>
+                {!currentDisplayValue && !isRolling && (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-300">
+                        —
+                    </div>
+                )}
 
                 {/* Glow effect on active */}
                 {value && !isRolling && (

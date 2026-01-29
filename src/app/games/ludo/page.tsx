@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LudoBoard } from "./components/LudoBoard";
 import { LudoPlayerCard } from "./components/PlayerCard";
 import { LudoDice } from "./components/ludo-dice";
@@ -34,6 +34,7 @@ export default function LudoPage() {
 
 function LudoGameContent() {
     const { user, signOut } = useAuth();
+    const router = useRouter();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get("session");
     const matchId = searchParams.get("match");
@@ -213,6 +214,13 @@ function LudoGameContent() {
         const winnerUserId = normalizedPlayers[state.winner]?.userId;
         return !!winnerUserId && winnerUserId === user?.id;
     }, [state.winner, isMultiplayer, normalizedPlayers, user?.id]);
+
+    const [dismissedWinner, setDismissedWinner] = useState(false);
+    useEffect(() => {
+        if (state.winner !== null) {
+            setDismissedWinner(false);
+        }
+    }, [state.winner]);
 
     const lastLog = logs?.[0] ?? "No moves yet.";
     const timelineLogs = (logs ?? []).slice(0, 4);
@@ -592,7 +600,7 @@ function LudoGameContent() {
             </main>
 
             {/* Game Over Overlay */}
-            {state.winner !== null && (
+            {state.winner !== null && !dismissedWinner && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="relative overflow-hidden bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
                         {isWinnerMe && (
@@ -606,12 +614,36 @@ function LudoGameContent() {
                         <p className="text-lg text-gray-600 mb-6">
                             {normalizedPlayers[state.winner]?.name || "Player"} wins!
                         </p>
-                        <button
-                            onClick={newGame}
-                            className="px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-bold hover:scale-105 transition-transform"
-                        >
-                            Play Again
-                        </button>
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => {
+                                    setDismissedWinner(true);
+                                    router.push("/games");
+                                }}
+                                className="px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-bold hover:scale-105 transition-transform"
+                            >
+                                Go Home
+                            </button>
+                            {isMultiplayer && matchId && (
+                                <button
+                                    onClick={() => {
+                                        setDismissedWinner(true);
+                                        router.push("/friends");
+                                    }}
+                                    className="px-8 py-2 rounded-xl border border-[var(--ludo-border-card)] text-sm font-semibold text-[var(--ludo-text-secondary)] hover:text-[var(--ludo-text-primary)] hover:border-[var(--accent)]/40 transition-colors"
+                                >
+                                    View Friends
+                                </button>
+                            )}
+                            {!isMultiplayer && (
+                                <button
+                                    onClick={() => setDismissedWinner(true)}
+                                    className="px-8 py-2 rounded-xl border border-[var(--ludo-border-card)] text-sm font-semibold text-[var(--ludo-text-secondary)] hover:text-[var(--ludo-text-primary)] hover:border-[var(--accent)]/40 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
