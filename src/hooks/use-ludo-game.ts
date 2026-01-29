@@ -402,6 +402,12 @@ export function useLudoGame(options: UseLudoGameOptions) {
             const token = state.tokens.find((t) => t.id === tokenId);
             if (!token) return;
 
+            if (!validMoveTokenIds.includes(tokenId)) {
+                const refreshedMoves = getValidMoves(state, state.diceValue);
+                if (!refreshedMoves.includes(tokenId)) return;
+                setValidMoveTokenIds(refreshedMoves);
+            }
+
             const fromPos = token.position;
             const nextState = moveToken(state, tokenId, state.diceValue);
             const movedToken = nextState.tokens.find((t) => t.id === tokenId);
@@ -443,7 +449,7 @@ export function useLudoGame(options: UseLudoGameOptions) {
                 onGameEnd?.(nextState.winner);
             }
         },
-        [state, addLog, persistMove, onGameEnd, isMultiplayer, sessionId, userId, updateSessionState]
+        [state, addLog, persistMove, onGameEnd, isMultiplayer, sessionId, userId, updateSessionState, validMoveTokenIds]
     );
 
     // AI Turn Logic - Only run AI if I am the host (Player 0) OR if it's single player
